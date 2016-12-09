@@ -15,10 +15,10 @@ public class SensorDataPoint extends DataPoint {
 	private final float y;
 	private final float z;
 
-	public SensorDataPoint(int deviceId, int sensorType, 
+	public SensorDataPoint(int upload, int sensorType, 
 			long timestamp, float x, float y, float z) 
 	{
-		super(deviceId, sensorType, timestamp);
+		super(upload, sensorType, timestamp);
 		this.x = x;
 		this.y = y;
 		this.z = z;
@@ -47,6 +47,12 @@ public class SensorDataPoint extends DataPoint {
         statement.setFloat(4, x);
         statement.setFloat(5, y);
         statement.setFloat(6, z);
+	}
+	
+	@Override
+	public String toString() 
+	{
+		return "DataPoint(Sensor=" + sensorType + ", timestamp=" + timestamp + ", data=(" + x + ", " + y + ", " + z + ")";
 	}
 
 }

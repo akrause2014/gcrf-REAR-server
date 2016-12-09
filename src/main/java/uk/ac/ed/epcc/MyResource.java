@@ -15,6 +15,7 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
@@ -30,9 +31,9 @@ import uk.ac.ed.epcc.rear.SensorDataPoint;
 
 /**
  * CREATE TABLE devices (uuid BINARY(16), timestamp BIGINT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
- * CREATE TABLE uploads (timestamp BIGINT, device INT NOT NULL, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, FOREIGN KEY (device) REFERENCES devices(id));
- * CREATE TABLE Sensor (upload INT NOT NULL, type INT, timestamp BIGINT, x REAL, y REAL, z REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
- * CREATE TABLE Location (upload INT NOT NULL, timestamp BIGINT, latitude REAL, longitude REAL, altitude REAL, accuracy REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
+ * CREATE TABLE uploads (timestamp BIGINT, device INT NOT NULL, id SERIAL PRIMARY KEY, FOREIGN KEY (device) REFERENCES devices(id));
+ * CREATE TABLE Sensor (upload BIGINT UNSIGNED NOT NULL, type INT, timestamp BIGINT, x REAL, y REAL, z REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
+ * CREATE TABLE Location (upload BIGINT UNSIGNED NOT NULL, timestamp BIGINT, latitude REAL, longitude REAL, altitude REAL, accuracy REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
  *  
  * SELECT(uuid), FROM_UNIXTIME(timestamp/1000), id FROM devices;
  */
@@ -40,18 +41,8 @@ import uk.ac.ed.epcc.rear.SensorDataPoint;
 @Path("gcrf-REAR")
 public class MyResource {
 	
-    /**
-     * Method handling HTTP GET requests. The returned object will be sent
-     * to the client as "text/plain" media type.
-     *
-     * @return String that will be returned as a text/plain response.
-     */
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    public String getIt() {
-        return "Got it!";
-    }
-    
+	public static final int VERSION = 1;
+	
     @Path("/register")
     @POST
     @Produces(MediaType.TEXT_PLAIN)
@@ -63,7 +54,7 @@ public class MyResource {
 			Connection connection = getDataSource().getConnection();
 			Statement statement = connection.createStatement();
 			statement.executeUpdate("INSERT INTO devices (uuid, timestamp) VALUES (UNHEX(\"" + id + "\"), " + currentTime + ")");
-			System.out.println("REGISTERED DEVICE " + id);
+			System.out.println("Registered new device: " + id);
 	    	return id;
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -74,13 +65,39 @@ public class MyResource {
 		}
     }
     
+    @Path("/register/{device}")
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public String isRegistered(@PathParam("device") String device) {
+		try {
+    		Connection con = getDataSource().getConnection();
+			getDeviceId(con, device);
+		} catch (UnknownDeviceException e) {
+			throw new NotFoundException("Unknown device: " + device);
+		} catch (SQLException e) {
+			throw new ServerErrorException(500);
+		} catch (NamingException e) {
+			throw new ServerErrorException(500);
+		}
+        return "True";
+    }
+    
+    @Path("/register/{device}")
+    @DELETE
+    @Produces(MediaType.TEXT_PLAIN)
+    public void deleteRegistered() {
+    	// TODO
+    }
+    
     @Path("/data/{device}/sensor")
     @POST
     @Consumes(MediaType.APPLICATION_OCTET_STREAM)
     public void receiveData(
     		@PathParam("device") String device, 
-    		InputStream is) {
+    		InputStream is) 
+    {
     	DataInputStream dataStream = new DataInputStream(is);
+		int count = 0;
     	Connection con = null;
     	try {
     		con = getDataSource().getConnection();
@@ -92,12 +109,15 @@ public class MyResource {
 			}
 			long uploadTs = System.currentTimeMillis();
 			int uploadID = createUpload(con, uploadTs, deviceId);
-			System.out.println("UPLOADING DATA FOR DEVICE " + device);
     		PreparedStatement statementSensor = con.prepareStatement(SensorDataPoint.getStatement());
     		PreparedStatement statementLocation = con.prepareStatement(LocationDataPoint.getStatement());
+			System.out.println("Uploading data for device: " + device);
     		while (true) {
     			try {
 		    		byte version = dataStream.readByte();
+		    		if (version != VERSION) {
+		    			new ServerErrorException("Unsupported message version: " + version, 400);
+		    		}
 		            int sensorType = dataStream.readByte();
 		            long timestamp = dataStream.readLong();
 		            switch (sensorType) {
@@ -127,8 +147,10 @@ public class MyResource {
 		            	// unsupported sensor type
 		            	break;
 		            }
+		            count++;
     			}
     			catch (SQLException e) {
+    				// log and move on to the next data point
     				e.printStackTrace();
     			}
     		}
@@ -144,7 +166,6 @@ public class MyResource {
 			e.printStackTrace();
 			throw new ServerErrorException(500);
 		} catch (NamingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 			throw new ServerErrorException(500);
 		}
@@ -156,11 +177,11 @@ public class MyResource {
 					// ignore this 
 				}
     		}
+			System.out.println("Upload complete for device: " + device + ", count=" + count);
     	}
     	
     }
     
-//    CREATE TABLE devices (uuid BINARY(16), timestamp BIGINT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
     private int getDeviceId(Connection con, String device) throws SQLException, UnknownDeviceException 
     {
 		Statement query = con.createStatement();
