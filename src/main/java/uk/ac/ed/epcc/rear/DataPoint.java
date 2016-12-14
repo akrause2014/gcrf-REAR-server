@@ -6,7 +6,8 @@ public abstract class DataPoint
 	public static final int SENSOR_TYPE_ACCELEROMETER = 1;
 	public static final int SENSOR_TYPE_GYROSCOPE = 2;
 	public static final int SENSOR_TYPE_MAGNETIC_FIELD = 3;
-	public static final int SENSOR_TYPE_LOCATION = 4;
+	public static final int TYPE_LOCATION = 4;
+	public static final int TYPE_TIME = 5;
 	
 	protected final int upload;
 	protected final int sensorType;

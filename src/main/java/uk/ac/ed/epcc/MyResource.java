@@ -1,9 +1,13 @@
 package uk.ac.ed.epcc;
 
+import java.io.BufferedWriter;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -23,18 +27,22 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.ServerErrorException;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 
 import uk.ac.ed.epcc.rear.DataPoint;
 import uk.ac.ed.epcc.rear.LocationDataPoint;
 import uk.ac.ed.epcc.rear.SensorDataPoint;
+import uk.ac.ed.epcc.rear.TimeDataPoint;
 
 /**
  * CREATE TABLE devices (uuid BINARY(16), timestamp BIGINT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
  * CREATE TABLE uploads (timestamp BIGINT, device INT NOT NULL, id SERIAL PRIMARY KEY, FOREIGN KEY (device) REFERENCES devices(id));
  * CREATE TABLE Sensor (upload BIGINT UNSIGNED NOT NULL, type INT, timestamp BIGINT, x REAL, y REAL, z REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
  * CREATE TABLE Location (upload BIGINT UNSIGNED NOT NULL, timestamp BIGINT, latitude REAL, longitude REAL, altitude REAL, accuracy REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
- *  
+ * CREATE TABLE Time (upload BIGINT UNSIGNED NOT NULL, timestamp BIGINT, systemTime BIGINT, FOREIGN KEY (upload) REFERENCES uploads(id)); 
  * SELECT(uuid), FROM_UNIXTIME(timestamp/1000), id FROM devices;
  */
 
@@ -89,6 +97,119 @@ public class MyResource {
     	// TODO
     }
     
+    @Path("/data/{device}/time")
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getTimeData(@PathParam("device") String device) {
+    	final int deviceId = getDevice(device);
+    	StreamingOutput stream = new StreamingOutput() {
+    	    @Override
+    	    public void write(OutputStream os) throws IOException, WebApplicationException {
+    	    	Connection con = null;
+    	    	try{
+    	    		con = getDataSource().getConnection();
+    	    		Statement statement = con.createStatement();
+    	    		ResultSet results = statement.executeQuery(
+    	    				"SELECT upload, " + TimeDataPoint.TABLE_NAME 
+    	    				+ ".timestamp, systemTime FROM " 
+    	    				+ TimeDataPoint.TABLE_NAME 
+    	    				+ " JOIN uploads ON upload=id AND device=" + deviceId);
+    	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+    	    		while (results.next()) {
+    	    			writer.write(String.format("%d,%d,%d\n", 
+    	    					results.getInt(1),
+    	    					results.getFloat(2), 
+    	    					results.getFloat(3)));
+    	    		}
+    	    		writer.flush();
+    	    		writer.close();
+
+    	    	}
+    	    	catch (SQLException e) {
+    				e.printStackTrace();
+    				throw new ServerErrorException(500);
+    			} catch (NamingException e) {
+    				e.printStackTrace();
+    				throw new ServerErrorException(500);
+    			}
+    	    	finally {
+    	    		if (con != null) {
+    	    			try {
+    						con.close();
+    					} catch (SQLException e) {
+    						// ignore this 
+    					}
+    	    		}
+    	    	}
+
+    	    }
+    	  };
+    	  return Response.ok(stream).build();
+    }
+    
+    @Path("/data/{device}/sensor")
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response getSensorData(@PathParam("device") String device) {
+    	final int deviceId = getDevice(device);
+    	StreamingOutput stream = new StreamingOutput() {
+    	    @Override
+    	    public void write(OutputStream os) throws IOException, WebApplicationException {
+    	    	Connection con = null;
+    	    	try{
+    	    		con = getDataSource().getConnection();
+    	    		Statement statement = con.createStatement();
+    	    		ResultSet results = statement.executeQuery(
+    	    				"SELECT upload, type, Sensor.timestamp, x, y, z FROM " + SensorDataPoint.TABLE_NAME 
+    	    				+ " JOIN uploads ON upload=id AND device=" + deviceId);
+    	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+    	    		while (results.next()) {
+        	    		String sensorType = "";
+        	    		switch (results.getInt(2)) {
+        	    		case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+        	    			sensorType = "A";
+        	    			break;
+        	    		case DataPoint.SENSOR_TYPE_GYROSCOPE:
+        	    			sensorType = "G";
+        	    			break;
+        	    		case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD:
+        	    			sensorType = "M";
+        	    			break;
+        	    		}
+    	    			writer.write(String.format("%d,%s,%d,%f,%f,%f\n", 
+    	    					results.getInt(1), 
+    	    					sensorType, 
+    	    					results.getLong(3), 
+    	    					results.getFloat(4), 
+    	    					results.getFloat(5), 
+    	    					results.getFloat(6)));
+    	    		}
+    	    		writer.flush();
+    	    		writer.close();
+    	    	}
+    	    	catch (SQLException e) {
+    				e.printStackTrace();
+    				throw new ServerErrorException(500);
+    			} catch (NamingException e) {
+    				e.printStackTrace();
+    				throw new ServerErrorException(500);
+    			}
+    	    	finally {
+    	    		if (con != null) {
+    	    			try {
+    						con.close();
+    					} catch (SQLException e) {
+    						// ignore this 
+    					}
+    	    		}
+    	    	}
+
+    	    }
+    	  };
+    	  return Response.ok(stream).build();
+
+    }
+ 
     @Path("/data/{device}/sensor")
     @POST
     @Consumes(MediaType.APPLICATION_OCTET_STREAM)
@@ -132,7 +253,7 @@ public class MyResource {
 		                statementSensor.execute();
 		            	break;
 		            }
-		            case DataPoint.SENSOR_TYPE_LOCATION: {
+		            case DataPoint.TYPE_LOCATION: {
 		            	double latitude = dataStream.readDouble();
 		            	double longitude = dataStream.readDouble();
 		            	double altitude = dataStream.readDouble();
@@ -141,6 +262,13 @@ public class MyResource {
 		            			new LocationDataPoint(uploadID, sensorType, timestamp, latitude, longitude, altitude, accuracy);
 		                dataPoint.prepareStatement(statementLocation);
 		                statementLocation.execute();
+		            	break;
+		            }
+		            case DataPoint.TYPE_TIME: {
+		            	long systemTime = dataStream.readLong();
+		            	TimeDataPoint dataPoint = new TimeDataPoint(uploadID, timestamp, systemTime);
+		            	Statement statement = con.createStatement();
+		            	statement.execute(dataPoint.getStatement());
 		            	break;
 		            }
 		            default:
@@ -198,6 +326,35 @@ public class MyResource {
 			query.close();
 		}
     }
+   
+    private int getDevice(String device)
+    {
+    	Connection con = null;
+    	try {
+    		con = getDataSource().getConnection();
+        	try {
+        		return getDeviceId(con, device);
+        	} catch (UnknownDeviceException e) {
+        		throw new NotFoundException("Unknown device: " + device);
+        	}
+    	}
+    	catch (SQLException e) {
+			throw new ServerErrorException(500);
+		} catch (NamingException e) {
+			throw new ServerErrorException(500);
+		}
+    	finally {
+    		if (con != null) {
+    			try {
+					con.close();
+				} catch (SQLException e) {
+					// ignore this 
+				}
+    		}
+    	}
+    }
+
+
     
     private int createUpload(Connection con, long uploadTs, int deviceId) throws SQLException {
 		Statement s = con.createStatement();

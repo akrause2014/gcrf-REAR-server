@@ -5,7 +5,7 @@ import java.sql.SQLException;
 
 /**
  * 
- * CREATE TABLE Location (upload INT NOT NULL, timestamp BIGINT, latitude REAL, longitude REAL, altitude REAL, accuracy REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
+ * CREATE TABLE Location (upload BIGINT UNSIGNED NOT NULL, timestamp BIGINT, latitude REAL, longitude REAL, altitude REAL, accuracy REAL, FOREIGN KEY (upload) REFERENCES uploads(id));
  *
  */
 public class LocationDataPoint extends DataPoint {
