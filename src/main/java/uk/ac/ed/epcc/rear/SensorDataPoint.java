@@ -1,6 +1,7 @@
 package uk.ac.ed.epcc.rear;
 
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 
 /**
@@ -54,5 +55,34 @@ public class SensorDataPoint extends DataPoint {
 	{
 		return "DataPoint(Sensor=" + sensorType + ", timestamp=" + timestamp + ", data=(" + x + ", " + y + ", " + z + ")";
 	}
+	
+    public static String toCSV(ResultSet results) 
+    {
+    	try {
+			String sensorType = "";
+			switch (results.getInt(2)) {
+			case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+				sensorType = "A";
+				break;
+			case DataPoint.SENSOR_TYPE_GYROSCOPE:
+				sensorType = "G";
+				break;
+			case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD:
+				sensorType = "M";
+				break;
+			}
+			return String.format("%d,%s,%d,%f,%f,%f\n", 
+					results.getInt(1), 
+					sensorType, 
+					results.getLong(3), 
+					results.getFloat(4), 
+					results.getFloat(5), 
+					results.getFloat(6));
+    	} catch (SQLException e) {
+    		// failed to convert
+    		return "";
+    	}
+    }
+
 
 }
