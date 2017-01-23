@@ -258,6 +258,7 @@ public class MyResource {
 		    		}
 		    		rs.close();
     	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+	    			writer.write("systemtime,elapsedtime,sensortype,x,y,z\n");
 		    		ResultSet results = statement.executeQuery(query);
 		    		while (results.next()) {
 		    			long timestamp = results.getLong(1);
@@ -275,12 +276,12 @@ public class MyResource {
 		    				break;
 		    			}
 		    			String line = String.format("%d,%d,%s,%f,%f,%f\n", 
-		    					translated,
-		    					timestamp,
-		    					sensorType, 
-		    					results.getFloat(3), 
-		    					results.getFloat(4), 
-		    					results.getFloat(5));
+		    					translated, // system time at start plus elapsed time
+		    					timestamp, // elapsed time as recorded by device
+		    					sensorType, // sensor type
+		    					results.getFloat(3),  // X
+		    					results.getFloat(4),  // Y
+		    					results.getFloat(5)); // Z
 		    			writer.write(line);
 		    		}
 		    		writer.flush();
@@ -412,7 +413,7 @@ public class MyResource {
     	
     }
     
-    private int getDeviceId(Connection con, String device) throws SQLException, UnknownDeviceException 
+    private static int getDeviceId(Connection con, String device) throws SQLException, UnknownDeviceException 
     {
 		Statement query = con.createStatement();
 		try {
@@ -429,7 +430,7 @@ public class MyResource {
 		}
     }
    
-    private int getDevice(String device)
+    public static int getDevice(String device)
     {
     	Connection con = null;
     	try {

@@ -10,16 +10,41 @@
 
 
 <html>
+<head>
+<style>
+table {
+    border-collapse: collapse;
+}
+
+table, th, td {
+    border: 1px solid black;
+}
+th, td {
+    padding: 10px;
+}
+</style>
+</head>
 <body>
     <h2><%=request.getParameter("device")%></h2>
     <table>
     <thead>
-    <tr><th align="left">Id</th><th align="left">Start (system time)</th><th>Length (ns)</th></tr>
+    <tr>
+    <th>Id</th>
+    <th>Start (system time)</th>
+    <th>End (system time)</th>
+    <th>Length (ns)</th>
+    <th></th>
+    </tr>
     </thead>
     <tbody>
     <%
     DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS");
-    String query = "SELECT Time.upload, MIN(Sensor.timestamp) AS start, MAX(Sensor.timestamp) AS end, systemTime FROM Time JOIN Sensor ON Time.upload=Sensor.upload GROUP BY Time.upload";
+    int device = MyResource.getDevice(request.getParameter("device"));
+	String query = "SELECT Time.upload, MIN(S.timestamp) AS start, MAX(S.timestamp) AS end, systemTime " 
+			+ "FROM Time JOIN " 
+			+ "(SELECT upload, type, Sensor.timestamp, x, y, z FROM Sensor JOIN uploads "
+					+ "ON id=upload WHERE device=" + device + ") as S " 
+			+ "ON Time.upload=S.upload GROUP BY Time.upload";
 	Connection con = null;
 	try{
 		con = MyResource.getDataSource().getConnection();
@@ -30,13 +55,18 @@
 			long start = results.getLong(2);
 			long end = results.getLong(3);
 			long st = results.getLong(4);
-			String systemTime = dateFormat.format(new Date(st));
 			long length = end-start;
+			Date startDate = new Date(st);
+			Date endDate = new Date(st+length/1000000); // length is in nanoseconds
+			String systemTime = dateFormat.format(startDate);
+			String endTime = dateFormat.format(endDate);
+			String formattedLength = String.format("%,d", length);
 			%>
 			<tr>
 				<td><%=upload%></td>
 				<td><%=systemTime%></td>
-				<td align="right"><%=length%></td>
+				<td><%=endTime%></td>
+				<td align="right"><%=formattedLength%></td>
 				<td><a href="webapi/gcrf-REAR/data/<%=request.getParameter("device")%>/sensor/<%=upload%>">Download</a></td>
 			</tr>
 			<%
