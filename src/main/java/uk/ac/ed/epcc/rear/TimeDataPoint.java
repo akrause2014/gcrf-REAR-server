@@ -25,5 +25,10 @@ public class TimeDataPoint extends DataPoint {
 				+ " (upload, timestamp, systemTime) VALUES ("
 				+ upload + "," + timestamp + "," + systemTime + ")";
 	}
+	
+	@Override
+	public String toString() {
+		return "TimeDataPoint[upload=" + upload + ", system=" + systemTime + ", elapsed=" + timestamp + "]";
+	}
 
 }

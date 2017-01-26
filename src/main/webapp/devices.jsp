@@ -43,6 +43,8 @@
             </tr>
             <%
         }
+        results.close();
+        statement.close();
     } catch (SQLException e) {
     } catch (NamingException e) {
     }

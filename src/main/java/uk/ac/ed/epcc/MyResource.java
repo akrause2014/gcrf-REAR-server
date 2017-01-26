@@ -16,14 +16,12 @@ import java.sql.Statement;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.UUID;
 import java.util.function.Function;
 
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 import javax.ws.rs.Consumes;
-import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
@@ -62,58 +60,11 @@ public class MyResource {
 	public static final int VERSION = 1;
 	private static final DateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss.SSS");
 
-	
-    @Path("/register")
-    @POST
-    @Produces(MediaType.TEXT_PLAIN)
-    public String registerDevice() {
-    	long currentTime = System.currentTimeMillis();
-    	UUID uuid = UUID.randomUUID();
-    	String id = uuid.toString().replaceAll("-", "");
-    	try {
-			Connection connection = getDataSource().getConnection();
-			Statement statement = connection.createStatement();
-			statement.executeUpdate("INSERT INTO devices (uuid, timestamp) VALUES (UNHEX(\"" + id + "\"), " + currentTime + ")");
-			System.out.println("Registered new device: " + id);
-	    	return id;
-		} catch (SQLException e) {
-			e.printStackTrace();
-			throw new ServerErrorException(500);
-		} catch (NamingException e) {
-			e.printStackTrace();
-			throw new ServerErrorException(500);
-		}
-    }
-    
-    @Path("/register/{device}")
-    @GET
-    @Produces(MediaType.TEXT_PLAIN)
-    public String isRegistered(@PathParam("device") String device) {
-		try {
-    		Connection con = getDataSource().getConnection();
-			getDeviceId(con, device);
-		} catch (UnknownDeviceException e) {
-			throw new NotFoundException("Unknown device: " + device);
-		} catch (SQLException e) {
-			throw new ServerErrorException(500);
-		} catch (NamingException e) {
-			throw new ServerErrorException(500);
-		}
-        return "True";
-    }
-    
-    @Path("/register/{device}")
-    @DELETE
-    @Produces(MediaType.TEXT_PLAIN)
-    public void deleteRegistered() {
-    	// TODO
-    }
-    
-    @Path("/data/{device}/time")
+	@Path("/data/{device}/time")
     @GET
     @Produces(MediaType.TEXT_PLAIN)
     public Response getTimeData(@PathParam("device") String device) {
-    	final int deviceId = getDevice(device);
+    	final int deviceId = RegisterDeviceResource.getDevice(device);
     	StreamingOutput stream = new StreamingOutput() {
     	    @Override
     	    public void write(OutputStream os) throws IOException, WebApplicationException {
@@ -135,7 +86,8 @@ public class MyResource {
     	    		}
     	    		writer.flush();
     	    		writer.close();
-
+    	    		results.close();
+    	    		statement.close();
     	    	}
     	    	catch (SQLException e) {
     				e.printStackTrace();
@@ -175,6 +127,8 @@ public class MyResource {
     	    		}
     	    		writer.flush();
     	    		writer.close();
+    	    		results.close();
+    	    		statement.close();
     	    	}
     	    	catch (SQLException e) {
     				e.printStackTrace();
@@ -238,7 +192,7 @@ public class MyResource {
     		@PathParam("device") String device,
     		@PathParam("upload") String upload) 
     {
-    	final int deviceId = getDevice(device);
+    	RegisterDeviceResource.getDevice(device);
     	StreamingOutput stream = new StreamingOutput() {
     	    @Override
     	    public void write(OutputStream os) throws IOException, WebApplicationException 
@@ -286,7 +240,8 @@ public class MyResource {
 		    		}
 		    		writer.flush();
 		    		writer.close();
-		   
+		    		results.close();
+		    		statement.close();
 		    	}	
 		    	catch (SQLException e) {
 					e.printStackTrace();
@@ -323,18 +278,20 @@ public class MyResource {
     	DataInputStream dataStream = new DataInputStream(is);
 		int count = 0;
     	Connection con = null;
+    	PreparedStatement statementSensor = null;
+    	PreparedStatement statementLocation = null;
     	try {
     		con = getDataSource().getConnection();
     		int deviceId;
 			try {
-				deviceId = getDeviceId(con, device);
+				deviceId = RegisterDeviceResource.getDeviceId(con, device);
 			} catch (UnknownDeviceException e) {
 				throw new NotFoundException("Unknown device: " + device);
 			}
 			long uploadTs = System.currentTimeMillis();
 			int uploadID = createUpload(con, uploadTs, deviceId);
-    		PreparedStatement statementSensor = con.prepareStatement(SensorDataPoint.getStatement());
-    		PreparedStatement statementLocation = con.prepareStatement(LocationDataPoint.getStatement());
+    		statementSensor = con.prepareStatement(SensorDataPoint.getStatement());
+    		statementLocation = con.prepareStatement(LocationDataPoint.getStatement());
 			System.out.println("Uploading data for device: " + device);
     		while (true) {
     			try {
@@ -371,7 +328,14 @@ public class MyResource {
 		            	long systemTime = dataStream.readLong();
 		            	TimeDataPoint dataPoint = new TimeDataPoint(uploadID, timestamp, systemTime);
 		            	Statement statement = con.createStatement();
-		            	statement.execute(dataPoint.getStatement());
+		            	int result = statement.executeUpdate(dataPoint.getStatement());
+		            	statement.close();
+		            	if (result != 1) {
+		            		System.err.println("WARNING: Insert " + dataPoint + " returned " + result);
+		            	}
+//		            	else {
+//		            		System.out.println("Inserted " + dataPoint);
+//		            	}
 		            	break;
 		            }
 		            default:
@@ -401,6 +365,16 @@ public class MyResource {
 			throw new ServerErrorException(500);
 		}
     	finally {
+    		if (statementSensor != null)
+				try {
+					statementSensor.close();
+				} catch (SQLException e1) {
+				}
+    		if (statementSensor != null)
+				try {
+					statementLocation.close();
+				} catch (SQLException e1) {
+				}
     		if (con != null) {
     			try {
 					con.close();
@@ -413,52 +387,50 @@ public class MyResource {
     	
     }
     
-    private static int getDeviceId(Connection con, String device) throws SQLException, UnknownDeviceException 
-    {
-		Statement query = con.createStatement();
-		try {
-			ResultSet result = query.executeQuery("SELECT id FROM devices WHERE HEX(uuid)=\"" + device + "\"");
-			if (result.next()) {
-				return result.getInt(1);
-			}
-			else {
-				throw new UnknownDeviceException(device);
-			}
-		}
-		finally {
-			query.close();
-		}
-    }
-   
-    public static int getDevice(String device)
-    {
-    	Connection con = null;
-    	try {
-    		con = getDataSource().getConnection();
-        	try {
-        		return getDeviceId(con, device);
-        	} catch (UnknownDeviceException e) {
-        		throw new NotFoundException("Unknown device: " + device);
-        	}
-    	}
-    	catch (SQLException e) {
-			throw new ServerErrorException(500);
-		} catch (NamingException e) {
-			throw new ServerErrorException(500);
-		}
-    	finally {
-    		if (con != null) {
-    			try {
-					con.close();
-				} catch (SQLException e) {
-					// ignore this 
-				}
-    		}
-    	}
-    }
-
-
-    
+//    private static int getDeviceId(Connection con, String device) throws SQLException, UnknownDeviceException 
+//    {
+//		Statement query = con.createStatement();
+//		try {
+//			ResultSet result = query.executeQuery("SELECT id FROM devices WHERE HEX(uuid)=\"" + device + "\"");
+//			if (result.next()) {
+//				return result.getInt(1);
+//			}
+//			else {
+//				throw new UnknownDeviceException(device);
+//			}
+//		}
+//		finally {
+//			query.close();
+//		}
+//    }
+//   
+//    public static int getDevice(String device)
+//    {
+//    	Connection con = null;
+//    	try {
+//    		con = getDataSource().getConnection();
+//        	try {
+//        		return getDeviceId(con, device);
+//        	} catch (UnknownDeviceException e) {
+//        		throw new NotFoundException("Unknown device: " + device);
+//        	}
+//    	}
+//    	catch (SQLException e) {
+//			throw new ServerErrorException(500);
+//		} catch (NamingException e) {
+//			throw new ServerErrorException(500);
+//		}
+//    	finally {
+//    		if (con != null) {
+//    			try {
+//					con.close();
+//				} catch (SQLException e) {
+//					// ignore this 
+//				}
+//    		}
+//    	}
+//    }
+//    
     private int createUpload(Connection con, long uploadTs, int deviceId) throws SQLException {
 		Statement s = con.createStatement();
 		s.executeUpdate("INSERT INTO uploads (timestamp, device) VALUES (" + uploadTs + "," + deviceId + ")");

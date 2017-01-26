@@ -1,5 +1,10 @@
 package uk.ac.ed.epcc.rear;
 
+import java.io.DataInputStream;
+import java.io.IOException;
+
+import javax.ws.rs.ServerErrorException;
+
 public abstract class DataPoint
 {
 	
@@ -30,6 +35,36 @@ public abstract class DataPoint
 	public long getTimestamp() {
 		return timestamp;
 	}
-
+	
+	public static DataPoint read(DataInputStream dataStream, int supported, int uploadID) throws IOException 
+	{
+		byte version = dataStream.readByte();
+		if (version != supported) {
+			new ServerErrorException("Unsupported message version: " + version, 400);
+		}
+        int sensorType = dataStream.readByte();
+        long timestamp = dataStream.readLong();
+        DataPoint dataPoint = null;
+        switch (sensorType) {
+		    case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+		    case DataPoint.SENSOR_TYPE_GYROSCOPE:
+		    case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD: {
+		        float x = dataStream.readFloat();
+		        float y = dataStream.readFloat();
+		        float z = dataStream.readFloat();
+		        dataPoint = new SensorDataPoint(uploadID, sensorType, timestamp, x, y, z);
+		    	break;
+		    }
+		    case DataPoint.TYPE_LOCATION: {
+		    	double latitude = dataStream.readDouble();
+		    	double longitude = dataStream.readDouble();
+		    	double altitude = dataStream.readDouble();
+		    	float accuracy = dataStream.readFloat();
+		    	dataPoint =	new LocationDataPoint(uploadID, sensorType, timestamp, 
+		    					latitude, longitude, altitude, accuracy);
+			}
+        }
+        return dataPoint;
+	}
 
 }

@@ -5,6 +5,7 @@
 <%@page import="java.sql.SQLException"%>
 <%@page import="java.sql.ResultSet"%>
 <%@page import="java.sql.Statement"%>
+<%@page import="uk.ac.ed.epcc.RegisterDeviceResource"%>
 <%@page import="uk.ac.ed.epcc.MyResource"%>
 <%@page import="java.sql.Connection"%>
 
@@ -39,7 +40,7 @@ th, td {
     <tbody>
     <%
     DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS");
-    int device = MyResource.getDevice(request.getParameter("device"));
+    int device = RegisterDeviceResource.getDevice(request.getParameter("device"));
 	String query = "SELECT Time.upload, MIN(S.timestamp) AS start, MAX(S.timestamp) AS end, systemTime " 
 			+ "FROM Time JOIN " 
 			+ "(SELECT upload, type, Sensor.timestamp, x, y, z FROM Sensor JOIN uploads "
@@ -71,6 +72,8 @@ th, td {
 			</tr>
 			<%
 		}
+		results.close();
+		statement.close();
 	} catch (SQLException e) {
 	} catch (NamingException e) {
 	}
