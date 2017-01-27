@@ -1,12 +1,17 @@
 package uk.ac.ed.epcc;
 
+import java.io.BufferedWriter;
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -17,15 +22,23 @@ import java.util.Properties;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
+import javax.ws.rs.BadRequestException;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
+import javax.ws.rs.Produces;
 import javax.ws.rs.ServerErrorException;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
 
 import org.glassfish.jersey.media.multipart.FormDataParam;
+
+import uk.ac.ed.epcc.rear.DataPoint;
 
 /**
  * CREATE TABLE devices (uuid BINARY(16), timestamp BIGINT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
@@ -56,20 +69,10 @@ public class DataStoreResource {
 		DATA_DIR = properties.getProperty(DATA_DIR_PROP);
 	}
 	
-    @Path("/data/{device}")
-    @POST
-    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-    public int receiveData(
-    		@PathParam("device") String device, 
-    		InputStream is) 
-    {
-    	return receiveData(device, null, null, null, null, is);
-    }
-    
     @Path("/metadata/{device}/{upload}")
     @POST
     @Consumes(MediaType.APPLICATION_OCTET_STREAM)
-    public void receiveData(
+    public void receiveMetadata(
     		@PathParam("device") String device, 
     		@PathParam("upload") String upload, 
     		InputStream is) 
@@ -97,7 +100,7 @@ public class DataStoreResource {
 			DataInputStream ds = new DataInputStream(is);
 			byte version = ds.readByte();
     		if (version != VERSION) {
-    			new ServerErrorException("Unsupported message version: " + version, 400);
+    			new BadRequestException("Unsupported message version: " + version);
     		}
 			int numRecords = ds.readInt();
 			long systemTime = ds.readLong();
@@ -105,6 +108,10 @@ public class DataStoreResource {
 			long startTime = ds.readLong();
 			long endTime = ds.readLong();
 			updateUpload(con, uploadId, startTime, endTime, systemTime, elapsedTime, numRecords);
+		}
+		catch (EOFException e) {
+			// unexpected end of file - invalid format
+			throw new BadRequestException("Invalid message format.");
 		}
 		finally {
 			try {
@@ -116,7 +123,16 @@ public class DataStoreResource {
 		}
     }
 
-
+    @Path("/data/{device}")
+    @POST
+    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+    public int receiveData(
+    		@PathParam("device") String device, 
+    		InputStream is) 
+    {
+    	return receiveData(device, null, null, null, null, is);
+    }
+    
     @Path("/data/{device}")
     @POST
     @Consumes(MediaType.MULTIPART_FORM_DATA)
@@ -168,80 +184,143 @@ public class DataStoreResource {
 			throw new ServerErrorException(500);
 		}
     	finally {
-    		if (con != null) {
-    			try {
-					con.close();
-				} catch (SQLException e) {
-					// ignore this 
-				}
-    		}
+			try {
+	    		if (con != null) con.close();
+			} catch (SQLException e) {
+				// ignore this 
+			}
     	}
     	
     }
     
-    private static void updateUpload(Connection con, long uploadId, 
+    @Path("/data/{device}/{upload}")
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response serveData(
+    		@PathParam("device") String device,
+    		@PathParam("upload") String upload) 
+    {
+    	int deviceId = RegisterDeviceResource.getDevice(device);
+    	StreamingOutput stream = new StreamingOutput() {
+    	    @Override
+    	    public void write(OutputStream os) throws IOException, WebApplicationException 
+    	    {
+    	    	File file = new File(new File(new File(DATA_DIR), String.valueOf(device)), upload);
+    	    	DataInputStream dataStream = new DataInputStream(new FileInputStream(file));
+	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+    			writer.write("systemtime,elapsedtime,sensortype,x,y,z\n");
+    			while (true) {
+    				if (VERSION != dataStream.readByte()) {
+    					throw new ServerErrorException(500);
+    				}
+		            int sensorType = dataStream.readByte();
+		            long timestamp = dataStream.readLong();
+		            switch (sensorType) {
+		            case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+		            case DataPoint.SENSOR_TYPE_GYROSCOPE:
+		            case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD: {
+		                float x = dataStream.readFloat();
+		                float y = dataStream.readFloat();
+		                float z = dataStream.readFloat();
+		                writer.write("");
+		            	break;
+		            }
+		            case DataPoint.TYPE_LOCATION: {
+		            	double latitude = dataStream.readDouble();
+		            	double longitude = dataStream.readDouble();
+		            	double altitude = dataStream.readDouble();
+		            	float accuracy = dataStream.readFloat();
+		            	break;
+		            }
+		            case DataPoint.TYPE_TIME: {
+		            	long systemTime = dataStream.readLong();
+		            	break;
+		            }
+		            default:
+		            	// unsupported sensor type
+		            	break;
+		            }
+    			}
+    	    }
+    	};
+    	return Response.ok(stream).build();
+
+    }
+    
+    private static int updateUpload(Connection con, long uploadId, 
     		long startTime, long endTime, 
     		long systemTime, long elapsedTime, 
     		int numRecords)
     		throws SQLException 
     {
-    	Statement statement = con.createStatement();
-    	String update = "UPDATE uploads SET start=" + startTime + ", end=" + endTime 
-    			+ ", length=" + (endTime-startTime)
-    			+ ", system=" + systemTime
-    			+ ", elapsed=" + elapsedTime
-    			+ ", records=" + numRecords 
-    			+ " WHERE id=" + uploadId;
-    	System.out.println("Updating upload metadata: " + update);
-    	int result = statement.executeUpdate(update);
-    	statement.close();
+    	Statement statement = null;
+    	try {
+    		statement = con.createStatement();
+	    	String update = "UPDATE uploads SET start=" + startTime + ", end=" + endTime 
+	    			+ ", length=" + (endTime-startTime)
+	    			+ ", system=" + systemTime
+	    			+ ", elapsed=" + elapsedTime
+	    			+ ", records=" + numRecords 
+	    			+ " WHERE id=" + uploadId;
+	    	System.out.println("Updating upload metadata: " + update);
+	    	return statement.executeUpdate(update);
+    	} finally {
+    		if (statement != null) statement.close();
+    	}
     }
 	
 	private static int createUpload(Connection con, long uploadTs, int deviceId, 
 			Long startTime, Long endTime, Long systemTime, Long numRecords)
 			throws SQLException {
-		Statement s = con.createStatement();
-		StringBuilder columns = new StringBuilder();
-		StringBuilder values = new StringBuilder();
-		columns.append("(timestamp, device");
-		values.append("(").append(uploadTs);
-		values.append(",").append(deviceId);
-		if (startTime != null) {
-			columns.append(", start");
-			values.append(",").append(startTime);
-		}
-		if (endTime != null) {
-			columns.append(", end");
-			values.append(",").append(endTime);
-		}
-		if (startTime != null && endTime != null) {
-			long length = endTime-startTime;
-			columns.append(", length");
-			values.append(",").append(length);
-		}
-		if (systemTime != null) {
-			columns.append(", system");
-			values.append(",").append(systemTime);
-		}
-		if (numRecords != null) {
-			columns.append(", records");
-			values.append(",").append(numRecords);
-		}
-		columns.append(")");
-		values.append(")");
-		String query = "INSERT INTO uploads " + columns + " VALUES " + values;
-//		System.out.println("New upload: " + query);
-		s.executeUpdate(query);
-		ResultSet result = s.executeQuery("SELECT MAX(id) FROM uploads WHERE timestamp=" + uploadTs);
-		if (result.next()) {
-			return result.getInt(1);
-		}
-		else {
-			throw new ServerErrorException(500);
+		Statement s = null;
+		ResultSet result = null;
+		try {
+			s = con.createStatement();
+			StringBuilder columns = new StringBuilder();
+			StringBuilder values = new StringBuilder();
+			columns.append("(timestamp, device");
+			values.append("(").append(uploadTs);
+			values.append(",").append(deviceId);
+			if (startTime != null) {
+				columns.append(", start");
+				values.append(",").append(startTime);
+			}
+			if (endTime != null) {
+				columns.append(", end");
+				values.append(",").append(endTime);
+			}
+			if (startTime != null && endTime != null) {
+				long length = endTime-startTime;
+				columns.append(", length");
+				values.append(",").append(length);
+			}
+			if (systemTime != null) {
+				columns.append(", system");
+				values.append(",").append(systemTime);
+			}
+			if (numRecords != null) {
+				columns.append(", records");
+				values.append(",").append(numRecords);
+			}
+			columns.append(")");
+			values.append(")");
+			String query = "INSERT INTO uploads " + columns + " VALUES " + values;
+	//		System.out.println("New upload: " + query);
+			s.executeUpdate(query);
+			result = s.executeQuery("SELECT MAX(id) FROM uploads WHERE timestamp=" + uploadTs);
+			if (result.next()) {
+				return result.getInt(1);
+			}
+			else {
+				throw new ServerErrorException(500);
+			}
+		} finally {
+			if (result != null) result.close();
+			if (s != null) s.close();
 		}
     }
 
-	private static DataSource getDataSource() throws NamingException
+	public static DataSource getDataSource() throws NamingException
 	{
 		InitialContext cxt = new InitialContext();
 		DataSource ds = (DataSource) cxt.lookup( "java:/comp/env/jdbc/rear_meta_db" );

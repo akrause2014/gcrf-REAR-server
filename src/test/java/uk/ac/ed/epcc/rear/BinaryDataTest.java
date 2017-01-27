@@ -37,6 +37,7 @@ public class BinaryDataTest
 		outputStream.writeInt(100); // number of records
 		outputStream.writeLong(new Date().getTime()); // system timestamp
 		outputStream.writeLong(1000000000l); // elapsed time in nanos matching timestamp
+		outputStream.writeLong(1000000000l); // start time (nanos)
 		outputStream.writeLong(3000000000l); // end time (nanos)
 		outputStream.close();
 	}
