@@ -75,7 +75,7 @@ th, td {
 				<td><%=endSystemTime%></td>
 				<td align="right"><%=formattedLength%></td>
 				<td align="right"><%=formattedRecords%></td>
-				<td><a href="webapi/gcrf-REAR/data/<%=request.getParameter("device")%>/sensor/<%=upload%>">Download</a></td>
+				<td><a href="webapi/gcrf-REAR/data/<%=request.getParameter("device")%>/<%=upload%>">Download</a></td>
 			</tr>
 			<%
 		}

@@ -2,7 +2,9 @@ package uk.ac.ed.epcc.rear;
 
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.Random;
 
 import org.junit.Test;
@@ -32,14 +34,19 @@ public class BinaryDataTest
 
 	@Test
 	public void testWriteMetadata() throws Exception {
-		DataOutputStream outputStream = new DataOutputStream(new FileOutputStream("/tmp/metadatatest"));
-		outputStream.writeByte(1); // version
-		outputStream.writeInt(100); // number of records
-		outputStream.writeLong(new Date().getTime()); // system timestamp
-		outputStream.writeLong(1000000000l); // elapsed time in nanos matching timestamp
-		outputStream.writeLong(1000000000l); // start time (nanos)
-		outputStream.writeLong(3000000000l); // end time (nanos)
-		outputStream.close();
+		for (int i=0; i<20; i++) {
+			DataOutputStream outputStream = new DataOutputStream(new FileOutputStream("/tmp/metadatatest" + i));
+			outputStream.writeByte(1); // version
+			outputStream.writeInt(100); // number of records
+			Calendar cal = new GregorianCalendar();
+			cal.add(Calendar.DAY_OF_MONTH, -i);
+			cal.add(Calendar.HOUR_OF_DAY, -i);
+			outputStream.writeLong(cal.getTimeInMillis()); // system timestamp in millis
+			outputStream.writeLong(1000l); // elapsed time in millis matching timestamp
+			outputStream.writeLong(1000000000l); // start time (nanos)
+			outputStream.writeLong(3000000000l); // end time (nanos)
+			outputStream.close();
+		}
 	}
 
 }

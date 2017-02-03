@@ -12,12 +12,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.rmi.ServerException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.GregorianCalendar;
 import java.util.Properties;
+import java.util.TimeZone;
 
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -57,6 +61,7 @@ public class DataStoreResource {
 	private static final String DATA_DIR_PROP = "data.dir";
 	private static final String DATA_DIR;
 	
+	
 	static {
 		Properties properties = new Properties();
 		try {
@@ -86,7 +91,7 @@ public class DataStoreResource {
 			int uploadId = -1;
 			String s = "SELECT id FROM uploads WHERE id=" + upload + " AND device=" + deviceId;
 			ResultSet result = query.executeQuery(s);
-			System.out.println(s);
+//			System.out.println(s);
 			if (result.next()) {
 				uploadId = result.getInt(1);
 			}
@@ -121,6 +126,159 @@ public class DataStoreResource {
 				// ignore
 			}
 		}
+    }
+
+    @Path("/metadata/{device}/{year}/{month}/{day}/{hour}")
+    @GET
+    @Produces("application/json")
+    public Response serveMetadata(
+    		@PathParam("device") String device,
+    		@PathParam("year") String year,
+    		@PathParam("month") String month,
+    		@PathParam("day") String day,
+    		@PathParam("hour") String hour) 
+    {
+    	return getMetadata(device, year, month, day, hour);
+    }
+    
+    @Path("/metadata/{device}/{year}/{month}/{day}")
+    @GET
+    @Produces("application/json")
+    public Response serveMetadata(
+    		@PathParam("device") String device,
+    		@PathParam("year") String year,
+    		@PathParam("month") String month,
+    		@PathParam("day") String day) 
+    {
+    	return getMetadata(device, year, month, day, null);
+    }
+
+    @Path("/metadata/{device}/{year}/{month}")
+    @GET
+    @Produces("application/json")
+    public Response serveMetadata(
+    		@PathParam("device") String device,
+    		@PathParam("year") String year,
+    		@PathParam("month") String month) 
+    {
+    	return getMetadata(device, year, month, null, null);
+    }
+
+    @Path("/metadata/{device}/{year}")
+    @GET
+    @Produces("application/json")
+    public Response serveMetadata(
+    		@PathParam("device") String device,
+    		@PathParam("year") String year) 
+    {
+    	return getMetadata(device, year, null, null, null);
+    }
+
+    @Path("/metadata/{device}")
+    @GET
+    @Produces("application/json")
+    public Response serveMetadata(
+    		@PathParam("device") String device) 
+    {
+    	return getMetadata(device, null, null, null, null);
+    }
+
+    public Response getMetadata(String device, String year, String month, String day, String hour) {
+//    	System.out.println("DEVICE: " + device + ", DATE: " + year + month + day + hour);
+    	int deviceId = RegisterDeviceResource.getDevice(device);
+    	StreamingOutput stream = new StreamingOutput() {
+    	    @Override
+    	    public void write(OutputStream os) throws IOException, WebApplicationException 
+    	    {
+    	    	Calendar start = null;
+    	    	Calendar end = null;
+        		try {
+	    	    	if (year != null) {
+	    	    		start = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
+	    	    		start.setTimeInMillis(0);
+	    	    		start.set(Calendar.YEAR, Integer.parseInt(year));
+	    	        	end = (Calendar)start.clone();
+	    	        	if (month != null) {
+	    	        		int m = Integer.parseInt(month)-1;
+	    	        		if (m < 0 || m > 11) {
+	    	        			throw new NotFoundException();
+	    	        		}
+	    	        		start.set(Calendar.MONTH, m);
+	    	        		end.set(Calendar.MONTH, m);
+	    	            	if (day != null) {
+	    	            		int d = Integer.parseInt(day);
+	    	            		start.set(Calendar.DAY_OF_MONTH, d);
+	        	        		end.set(Calendar.DAY_OF_MONTH, d);
+	    	                	if (hour != null) {
+	    	                		start.set(Calendar.HOUR_OF_DAY, Integer.parseInt(hour));
+	    	    	        		end.set(Calendar.HOUR_OF_DAY, start.get(Calendar.HOUR_OF_DAY));
+	    	                		end.add(Calendar.HOUR_OF_DAY, 1);
+	    	                	}
+	    	                	else {
+	    	                		end.add(Calendar.DAY_OF_MONTH, 1);
+	    	                	}
+	    	            	}
+	    	            	else {
+	    	            		end.add(Calendar.MONTH, 1);
+	    	            	}
+	    	        	}
+	    	        	else {
+	        	        	end.add(Calendar.YEAR, 1);
+	    	        	}
+	    	    	}
+        		}
+        		catch (NumberFormatException e) {
+        			throw new NotFoundException();
+        		}
+
+    	    	Connection con = null;
+    	    	try {
+    	    		con = getDataSource().getConnection();
+    	    		String query = "SELECT * FROM uploads WHERE device=" + deviceId;
+    	    		if (start != null) {
+    	    			query += " AND system BETWEEN " + start.getTimeInMillis() + " AND " + end.getTimeInMillis();
+    	    		}
+    	    		System.out.println(query);
+	    			// timestamp | device | id | start | end | length | system | elapsed | records
+    	    		Statement st = con.createStatement();
+    	    		ResultSet result = st.executeQuery(query);
+    	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+    	    		writer.write("[\n");
+    	    		boolean first = true;
+    	    		while (result.next()) {
+    	    			if (!first) {
+    	    				writer.write(",\n");
+    	    			}
+    	    			else {
+    	    				first = false;
+    	    			}
+    	    			writer.write(String.format("[%d,%d,%d,%d,%d,%d,%d]",
+    	    					result.getLong(3),
+    	    					result.getLong(4),
+    	    					result.getLong(5),
+    	    					result.getLong(6),
+    	    					result.getLong(7),
+    	    					result.getLong(8),
+    	    					result.getLong(9)));
+    	    		}
+    	    		writer.write("\n]");
+    	    		writer.close();
+    	    	}
+    	    	catch (SQLException e) {
+    	    		throw new ServerException("Could not read uploads", e);
+    	    	} catch (NamingException e) {
+    	    		throw new ServerException("Could not read uploads", e);
+				}
+    	    	finally {
+    	    		try {
+    	    			if (con != null) con.close();
+    	    		} catch (SQLException e) {
+    	    			// ignore
+    	    		}
+    	    	}
+    	    }
+    	};
+    	return Response.ok(stream).build();
     }
 
     @Path("/data/{device}")
@@ -200,46 +358,67 @@ public class DataStoreResource {
     		@PathParam("device") String device,
     		@PathParam("upload") String upload) 
     {
+    	System.out.println("GETTING DATA : " + device + "/" + upload);
     	int deviceId = RegisterDeviceResource.getDevice(device);
+    	System.out.println("DEVICE ID=" + deviceId);
     	StreamingOutput stream = new StreamingOutput() {
     	    @Override
     	    public void write(OutputStream os) throws IOException, WebApplicationException 
     	    {
-    	    	File file = new File(new File(new File(DATA_DIR), String.valueOf(device)), upload);
+    	    	File file = new File(new File(new File(DATA_DIR), String.valueOf(deviceId)), upload);
+    	    	if (!file.exists() || !file.isFile()) {
+    	    		return;
+    	    	}
     	    	DataInputStream dataStream = new DataInputStream(new FileInputStream(file));
 	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
     			writer.write("systemtime,elapsedtime,sensortype,x,y,z\n");
-    			while (true) {
-    				if (VERSION != dataStream.readByte()) {
-    					throw new ServerErrorException(500);
-    				}
-		            int sensorType = dataStream.readByte();
-		            long timestamp = dataStream.readLong();
-		            switch (sensorType) {
-		            case DataPoint.SENSOR_TYPE_ACCELEROMETER:
-		            case DataPoint.SENSOR_TYPE_GYROSCOPE:
-		            case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD: {
-		                float x = dataStream.readFloat();
-		                float y = dataStream.readFloat();
-		                float z = dataStream.readFloat();
-		                writer.write("");
-		            	break;
-		            }
-		            case DataPoint.TYPE_LOCATION: {
-		            	double latitude = dataStream.readDouble();
-		            	double longitude = dataStream.readDouble();
-		            	double altitude = dataStream.readDouble();
-		            	float accuracy = dataStream.readFloat();
-		            	break;
-		            }
-		            case DataPoint.TYPE_TIME: {
-		            	long systemTime = dataStream.readLong();
-		            	break;
-		            }
-		            default:
-		            	// unsupported sensor type
-		            	break;
-		            }
+    			try {
+	    			while (true) {
+	    				if (VERSION != dataStream.readByte()) {
+	    					throw new ServerErrorException(500);
+	    				}
+			            int sensorType = dataStream.readByte();
+			            long timestamp = dataStream.readLong();
+			            writer.write(String.format(",%d", timestamp));
+			            switch (sensorType) {
+			            case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+			            case DataPoint.SENSOR_TYPE_GYROSCOPE:
+			            case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD: {
+			            	switch (sensorType) {
+			            	case DataPoint.SENSOR_TYPE_ACCELEROMETER:
+			            		writer.write('A');
+			            	}
+			                float x = dataStream.readFloat();
+			                float y = dataStream.readFloat();
+			                float z = dataStream.readFloat();
+			                writer.write(String.format(",%.10f", x));
+			                writer.write(String.format(",%.10f", y));
+			                writer.write(String.format(",%.10f\n", z));
+			            	break;
+			            }
+			            case DataPoint.TYPE_LOCATION: {
+			            	double latitude = dataStream.readDouble();
+			            	double longitude = dataStream.readDouble();
+			            	double altitude = dataStream.readDouble();
+			            	float accuracy = dataStream.readFloat();
+			            	break;
+			            }
+			            case DataPoint.TYPE_TIME: {
+			            	long systemTime = dataStream.readLong();
+			            	break;
+			            }
+			            default:
+			            	// unsupported sensor type
+			            	break;
+			            }
+	    			}
+    			}
+    			catch (EOFException e) {
+    				writer.flush();
+    				writer.close();
+    			}
+    			finally {
+    				dataStream.close();
     			}
     	    }
     	};

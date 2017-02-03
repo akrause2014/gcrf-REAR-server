@@ -41,11 +41,11 @@ th, td {
     <%
     DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS");
     int device = RegisterDeviceResource.getDevice(request.getParameter("device"));
-	String query = "SELECT Time.upload, MIN(S.timestamp) AS start, MAX(S.timestamp) AS end, systemTime " 
-			+ "FROM Time JOIN " 
+	String query = "SELECT S.upload, MIN(S.timestamp) AS start, MAX(S.timestamp) AS end, systemTime " 
+			+ "FROM Time RIGHT OUTER JOIN " 
 			+ "(SELECT upload, type, Sensor.timestamp, x, y, z FROM Sensor JOIN uploads "
 					+ "ON id=upload WHERE device=" + device + ") as S " 
-			+ "ON Time.upload=S.upload GROUP BY Time.upload";
+			+ "ON Time.upload=S.upload GROUP BY S.upload";
 	Connection con = null;
 	try{
 		con = MyResource.getDataSource().getConnection();
@@ -55,12 +55,19 @@ th, td {
 			long upload = results.getLong(1);
 			long start = results.getLong(2);
 			long end = results.getLong(3);
-			long st = results.getLong(4);
 			long length = end-start;
-			Date startDate = new Date(st);
-			Date endDate = new Date(st+length/1000000); // length is in nanoseconds
-			String systemTime = dateFormat.format(startDate);
-			String endTime = dateFormat.format(endDate);
+			long st = results.getLong(4);
+			String systemTime, endTime;
+			if (results.wasNull()) {
+				systemTime = "";
+				endTime = "";
+			}
+			else {
+				Date startDate = new Date(st);
+				Date endDate = new Date(st+length/1000000); // length is in nanoseconds
+				endTime = dateFormat.format(endDate);
+				systemTime = dateFormat.format(startDate);
+			}
 			String formattedLength = String.format("%,d", length);
 			%>
 			<tr>

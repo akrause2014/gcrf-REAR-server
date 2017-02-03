@@ -59,6 +59,7 @@ public class MyResource {
 	
 	public static final int VERSION = 1;
 	private static final DateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss.SSS");
+	private static final String[] SENSOR_TYPES = {"A", "G", "M"};
 
 	@Path("/data/{device}/time")
     @GET
@@ -204,34 +205,24 @@ public class MyResource {
 		    		con = getDataSource().getConnection();
 		    		Statement statement = con.createStatement();
 		    		ResultSet rs = statement.executeQuery(timeQuery);
-		    		long startTimestamp = -1;
-		    		long systemTime = -1;
+		    		long startTimestamp = 0;
+		    		long systemTime = 0;
 		    		if (rs.next()) {
+		    			// these timestamps are in milliseconds
 		    			startTimestamp = rs.getLong(1);
-		    			systemTime = rs.getLong(2) * 1000000;
+		    			systemTime = rs.getLong(2);
 		    		}
 		    		rs.close();
     	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
-	    			writer.write("systemtime,elapsedtime,sensortype,x,y,z\n");
+	    			writer.write("year,month,day,hour,minute,second,sensortype,x,y,z\n");
 		    		ResultSet results = statement.executeQuery(query);
 		    		while (results.next()) {
 		    			long timestamp = results.getLong(1);
-		    			long translated = (timestamp-startTimestamp) + systemTime;
-		    			String sensorType = "";
-		    			switch (results.getInt(2)) {
-		    			case DataPoint.SENSOR_TYPE_ACCELEROMETER:
-		    				sensorType = "A";
-		    				break;
-		    			case DataPoint.SENSOR_TYPE_GYROSCOPE:
-		    				sensorType = "G";
-		    				break;
-		    			case DataPoint.SENSOR_TYPE_MAGNETIC_FIELD:
-		    				sensorType = "M";
-		    				break;
-		    			}
-		    			String line = String.format("%d,%d,%s,%f,%f,%f\n", 
-		    					translated, // system time at start plus elapsed time
-		    					timestamp, // elapsed time as recorded by device
+		    			Date trd = new Date((timestamp/1000000-startTimestamp) + systemTime);
+		    			String sensorType = SENSOR_TYPES[results.getInt(2)];
+		    			DateFormat df  = new SimpleDateFormat("y,M,d,H,m,s.S");
+		    			String line = String.format("%s,%s,%f,%f,%f\n",
+		    					df.format(trd),
 		    					sensorType, // sensor type
 		    					results.getFloat(3),  // X
 		    					results.getFloat(4),  // Y
