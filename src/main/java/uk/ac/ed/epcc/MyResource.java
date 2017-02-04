@@ -216,11 +216,11 @@ public class MyResource {
     	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
 	    			writer.write("year,month,day,hour,minute,second,sensortype,x,y,z\n");
 		    		ResultSet results = statement.executeQuery(query);
+	    			DateFormat df  = new SimpleDateFormat("y,M,d,H,m,s.S");
 		    		while (results.next()) {
 		    			long timestamp = results.getLong(1);
 		    			Date trd = new Date((timestamp/1000000-startTimestamp) + systemTime);
-		    			String sensorType = SENSOR_TYPES[results.getInt(2)];
-		    			DateFormat df  = new SimpleDateFormat("y,M,d,H,m,s.S");
+		    			String sensorType = SENSOR_TYPES[results.getInt(2)-1];
 		    			String line = String.format("%s,%s,%f,%f,%f\n",
 		    					df.format(trd),
 		    					sensorType, // sensor type

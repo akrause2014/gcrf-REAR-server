@@ -37,15 +37,17 @@
 		};
 	var plot;
     var d = [];
+    var dates = new Object();
 
 
 	function getMetadata() {
 		console.log("get json");
 		var url = "webapi/gcrf-REAR/metadata/" + "<%=request.getParameter("device")%>" + "/";
 		console.log(url);
+		d = [];
+		dates = new Object();
 		// id | start      | end        | length     | system        | elapsed    | records
 		$.getJSON( url,	function( data ) {
-		  var dates = new Object();
 		  $.each( data, function( key, val ) {
 		    //console.log(key +"=" + val);
 		    var start = val[1];
@@ -55,12 +57,12 @@
 		    var startTime = system + start/1000000 - elapsed;
 		    var date = new Date(startTime);
 		    date = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours());
-		    var thisDay = date.getTime();
-		    if (thisDay in dates) {
-		    	dates[thisDay] = dates[thisDay]+records;
+		    var hour = date.getTime();
+		    if (hour in dates) {
+		    	dates[hour] = dates[hour]+records;
 		    }
 		    else {
-		    	dates[thisDay] = records;
+		    	dates[hour] = records;
 		    }
 		  });
 		  //console.log(dates);
@@ -80,15 +82,15 @@
 		var ti = t.indexOf("T");
 		$('#start_date').val(s.substring(0, si));
 		// only get the full hour
-		$('#start_time').val(s.substring(si+1, si+3) + ":00");
+		$('#start_time').val(s.substring(si+1, si+6));
 		$('#end_date').val(t.substring(0, ti));
-		$('#end_time').val(t.substring(ti+1, ti+3) + ":00");
+		$('#end_time').val(t.substring(ti+1, ti+6));
 	}
 	
 	$(function() {
 		getMetadata();
 
-		var overview = $.plot("#overview", [d], {
+/* 		var overview = $.plot("#overview", [d], {
 			series: {
 				lines: {
 					show: true,
@@ -109,7 +111,7 @@
 				mode: "x"
 			}
 		});
-
+ */
 		$("#placeholder").bind("plotclick", function (event, pos, item) {
 			if (item) {
 				var timestamp = item.datapoint[0];
@@ -127,6 +129,15 @@
 			plot.setupGrid();
 			plot.draw();
 			plot.clearSelection();
+			
+			var records = 0;
+			$.each( dates, function( key, val ) {
+				if (key >= ranges.xaxis.from && key < ranges.xaxis.to) {
+					records += val;
+				}
+			});
+			$('#selected_records').text('Selected: ' + records.toLocaleString() + " records");
+			$('#download').prop('disabled', false);
 			
 			var s = new Date(ranges.xaxis.from).toISOString();
 			var t = new Date(ranges.xaxis.to).toISOString();
@@ -147,11 +158,12 @@
 					if (!endTime) endTime = '00:00';
 					var s = new Date(startDate + "T" + startTime);
 					var e = new Date(endDate + "T" + endTime);
+					var url = "webapi/gcrf-REAR/data/" + "<%=request.getParameter("device")%>" 
+						+ "/date/"+ startDate + "T" + startTime + "/" + endDate + "T" + endTime;
+					console.log(url);
+					$(location).attr('href',url);
 				}
 			}
-			var url = "webapi/gcrf-REAR/metadata/" + "<%=request.getParameter("device")%>";
-			console.log(url);
-			$(location).attr('href',url);
 		});
 		
 		$('#clear_selection').bind("click", function() {
@@ -165,14 +177,16 @@
 			$('#start_time').val('');
 			$('#end_date').val('');
 			$('#end_time').val('');
+			$('#selected_records').text('');
+			$('#download').prop('disabled', true);
 			plot.setupGrid();
 			plot.draw();
 			plot.clearSelection();
 		});
 
-		$("#overview").bind("plotselected", function (event, ranges) {
-			plot.setSelection(ranges);
-		});
+//		$("#overview").bind("plotselected", function (event, ranges) {
+//			plot.setSelection(ranges);
+//		});
 
 		// Add the Flot version string to the footer
 
@@ -184,7 +198,7 @@
 <body>
 
 	<div id="header">
-		<h2>Uploads</h2>
+		<h3>Device <%=request.getParameter("device")%></h3>
 	</div>
 
 	<div id="content">
@@ -206,20 +220,17 @@
 			<input id="end_time" type="time"></input>
 		</div>
 		<div>
-			<a href="#" id="download">Download</a>
+			<div id="selected_records"></div>
+			<button id="download" disabled="disabled">Download</button>
 		</div>
 		<div>
 			<button id="clear_selection">Clear Selection</button>
 		</div>
 		
-		<div class="demo-container" style="height:150px;">
+<!-- 		<div class="demo-container" style="height:150px;">
 			<div id="overview" class="demo-placeholder"></div>
 		</div>
-
-	</div>
-
-	<div id="footer">
-		Copyright &copy; 2007 - 2014 IOLA and Ole Laursen
+ -->
 	</div>
 
 </body>
