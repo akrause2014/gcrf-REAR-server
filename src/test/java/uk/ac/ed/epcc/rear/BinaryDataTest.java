@@ -3,7 +3,6 @@ package uk.ac.ed.epcc.rear;
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Random;
 
@@ -19,12 +18,19 @@ public class BinaryDataTest
 		DataOutputStream outputStream = new DataOutputStream(new FileOutputStream("/tmp/datatest"));
 		outputStream.writeByte(1);
 		outputStream.writeByte(DataPoint.TYPE_TIME);
-		outputStream.writeLong(100000);
+		outputStream.writeLong(1000000);
 		outputStream.writeLong(System.currentTimeMillis());
+		outputStream.writeByte(1);
+		outputStream.writeByte(DataPoint.TYPE_LOCATION);
+		outputStream.writeLong(1000000);
+		outputStream.writeDouble(55.9533);
+		outputStream.writeDouble(3.1883);
+		outputStream.writeDouble(47);
+		outputStream.writeFloat(2);
 		for (int i=0; i<10; i++) {
 			outputStream.writeByte(1); // version
 			outputStream.writeByte(1); // sensor type: accelerometer
-			outputStream.writeLong(100000+i*20000000); // timestamp
+			outputStream.writeLong(1000000+i*20000000); // timestamp
 			outputStream.writeFloat(random.nextFloat()); // X
 			outputStream.writeFloat(random.nextFloat()); // Y
 			outputStream.writeFloat(random.nextFloat()); // Z
