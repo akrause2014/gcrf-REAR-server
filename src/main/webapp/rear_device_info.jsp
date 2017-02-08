@@ -62,12 +62,11 @@ th, td {
 			Date startDate = new Date(start);
 			Date endDate = new Date(end); // length is in nanoseconds
 			// difference between start timestamp and elapsed timestamp that matches the system time
-			long diff = (start-elapsed)/1000000; 
+			long diff = start/1000000-elapsed; 
 			String systemTime = dateFormat.format(system + diff); 
 			String endSystemTime = dateFormat.format(system+(length/1000000));
-			String formattedLength = String.format("%,d", length/1000000);
+			String formattedLength = String.format("%.3f", ((double)length)/1000000000.0);
 			String formattedRecords = String.format("%,d", records);
-			%><%=upload %><%
 			%>
 			<tr>
 				<td><%=upload%></td>

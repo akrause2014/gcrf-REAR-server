@@ -23,7 +23,11 @@
     <h2>Registered devices</h2>
     <table>
     <thead>
-    <tr><th align="left">Device</th><th align="left">Registration</th></tr>
+    <tr>
+    <th align="left">Device</th>
+    <th align="left">Name</th>
+	<th align="left">Registration</th>
+	</tr>
     </thead>
     <tbody>
     <%
@@ -31,14 +35,17 @@
     try{
         con = MyResource.getDataSource().getConnection();
         Statement statement = con.createStatement();
-        String query = "SELECT HEX(uuid), FROM_UNIXTIME(timestamp/1000) FROM devices";
+        String query = "SELECT HEX(uuid), name, FROM_UNIXTIME(timestamp/1000) FROM devices";
         ResultSet results = statement.executeQuery(query);
         while (results.next()) {
             String device = results.getString(1);
-            String ts = results.getString(2);
+            String name = results.getString(2);
+            if (results.wasNull()) name = "";
+            String ts = results.getString(3);
             %>
             <tr>
                 <td><a href="rear_device_info.jsp?device=<%=device%>"><%=device%></a></td>
+                <td><%=name%></td>
                 <td><%=ts%></td>
             </tr>
             <%

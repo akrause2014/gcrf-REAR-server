@@ -1,5 +1,7 @@
 package uk.ac.ed.epcc;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -9,13 +11,17 @@ import java.util.UUID;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
+import javax.ws.rs.DefaultValue;
+import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.ServerErrorException;
 import javax.ws.rs.core.MediaType;
 
@@ -28,8 +34,25 @@ public class RegisterDeviceResource {
 	
     @Path("/register")
     @POST
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
     @Produces(MediaType.TEXT_PLAIN)
-    public String registerDevice() {
+    public String registerDeviceForm(
+    		@FormParam("name") String name)
+    {
+    	try {
+	    	return registerDevice(URLDecoder.decode(name, "UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			throw new ServerErrorException(500);
+		}
+    }
+
+	
+    @Path("/register")
+    @POST
+    @Produces(MediaType.TEXT_PLAIN)
+    public String registerDevice(
+    		@DefaultValue("") @QueryParam("name") String name)
+    {
     	long currentTime = System.currentTimeMillis();
     	UUID uuid = UUID.randomUUID();
     	String id = uuid.toString().replaceAll("-", "");
@@ -38,8 +61,15 @@ public class RegisterDeviceResource {
     	try {
 			connection = getDataSource().getConnection();
 			statement = connection.createStatement();
-			statement.executeUpdate("INSERT INTO devices (uuid, timestamp) VALUES (UNHEX(\"" + id + "\"), " + currentTime + ")");
-			System.out.println("Registered new device: " + id);
+			String sql;
+			if (name != null && !name.isEmpty()) {
+				sql = "INSERT INTO devices (uuid, timestamp, name) VALUES (UNHEX(\"" + id + "\"), " + currentTime + ", \"" + name + "\")";
+			}
+			else {
+				sql = "INSERT INTO devices (uuid, timestamp) VALUES (UNHEX(\"" + id + "\"), " + currentTime + ")";
+			}
+			statement.executeUpdate(sql);
+			System.out.println("Registered new device: " + id + ", name = " + name);
 	    	return id;
 		} catch (SQLException e) {
 			e.printStackTrace();
