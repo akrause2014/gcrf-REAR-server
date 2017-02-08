@@ -6,6 +6,10 @@
 <%@page import="java.sql.Connection"%>
 <html>
 <head>
+	<link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.13/css/jquery.dataTables.css">
+	<script type="text/javascript" type="text/javascript" src="flot/jquery.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.13/js/jquery.dataTables.js"></script>
+
     <style>
     table {
         border-collapse: collapse;
@@ -18,10 +22,16 @@
         padding: 10px;
     }
     </style>
+    <script type="text/javascript">
+	    $(document).ready(function(){
+   	    	$('#deviceTable').DataTable();
+	    });
+    </script>
+    
 </head>
 <body>
     <h2>Registered devices</h2>
-    <table>
+    <table id="deviceTable">
     <thead>
     <tr>
     <th align="left">Device</th>

@@ -13,6 +13,14 @@
 
 <html>
 <head>
+
+	<link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.13/css/jquery.dataTables.css">
+	<script type="text/javascript" type="text/javascript" src="flot/jquery.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.13/js/jquery.dataTables.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.4/moment.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdn.datatables.net/plug-ins/1.10.13/sorting/datetime-moment.js"></script>
+	
+
 <style>
 table {
     border-collapse: collapse;
@@ -25,10 +33,22 @@ th, td {
     padding: 10px;
 }
 </style>
+
+    <script type="text/javascript">
+	    $(document).ready(function(){
+	        $.fn.dataTable.moment( 'DD/MM/YYYY HH:mm:ss.SSS' );
+   	    	$('#uploadTable').DataTable({
+   	    		"order": [[ 1, "asc" ]],
+   	    		"pageLength": 50,
+   	    		stateSave: true
+   	    	});
+	    });
+    </script>
+
 </head>
 <body>
     <h2><%=request.getParameter("device")%></h2>
-    <table>
+    <table id="uploadTable" class="stripe row-border" cellspacing="0">
     <thead>
     <tr>
     <th>Id</th>
