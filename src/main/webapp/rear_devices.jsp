@@ -9,6 +9,8 @@
 	<link rel="stylesheet" type="text/css" href="//cdn.datatables.net/1.10.13/css/jquery.dataTables.css">
 	<script type="text/javascript" type="text/javascript" src="flot/jquery.js"></script>
 	<script type="text/javascript" charset="utf8" src="//cdn.datatables.net/1.10.13/js/jquery.dataTables.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.4/moment.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="//cdn.datatables.net/plug-ins/1.10.13/sorting/datetime-moment.js"></script>
 
     <style>
     table {
@@ -24,7 +26,12 @@
     </style>
     <script type="text/javascript">
 	    $(document).ready(function(){
-   	    	$('#deviceTable').DataTable();
+	        $.fn.dataTable.moment( 'DD/MM/YYYY HH:mm:ss.SSS' );
+   	    	$('#deviceTable').DataTable({
+   	    		"order": [[ 2, "asc" ]],
+   	    		"pageLength": 50,
+   	    		stateSave: true
+   	    	});
 	    });
     </script>
     
@@ -54,7 +61,7 @@
             String ts = results.getString(3);
             %>
             <tr>
-                <td><a href="rear_device_info.jsp?device=<%=device%>"><%=device%></a></td>
+                <td><a href="device_uploads.jsp?device=<%=device%>"><%=device%></a></td>
                 <td><%=name%></td>
                 <td><%=ts%></td>
             </tr>

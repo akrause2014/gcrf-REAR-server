@@ -38,7 +38,7 @@ th, td {
 	    $(document).ready(function(){
 	        $.fn.dataTable.moment( 'DD/MM/YYYY HH:mm:ss.SSS' );
    	    	$('#uploadTable').DataTable({
-   	    		"order": [[ 1, "asc" ]],
+   	    		"order": [[ 1, "desc" ]],
    	    		"pageLength": 50,
    	    		stateSave: true
    	    	});
