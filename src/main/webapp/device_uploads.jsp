@@ -23,6 +23,7 @@
 			//},
 			xaxis: {
 				mode: "time",
+				timeformat:"%d/%m/%y %H:%M"
 				//min: (new Date("2017/01/01")).getTime(),
 			    //max: (new Date("2017/03/01")).getTime(),
 				//tickSize: [1, "day"]
@@ -39,11 +40,13 @@
     var d = [];
     var dates = new Object();
 
-
-	function getMetadata() {
-		console.log("get json");
+    function getMetadata() {
 		var url = "webapi/gcrf-REAR/metadata/" + "<%=request.getParameter("device")%>" + "/";
-		console.log(url);
+		return getMetadataFrom(url);
+    }
+    
+	function getMetadataFrom(url, callback) {
+		//console.log(url);
 		d = [];
 		dates = new Object();
 		// id | start      | end        | length     | system        | elapsed    | records
@@ -69,7 +72,12 @@
 		  $.each( dates, function( key, val ) {
 			  d.push([key, val]);
 		  });
-          plot = $.plot("#placeholder", [d], options);
+		  if (callback) {
+			  callback();
+		  }
+		  else {
+	          plot = $.plot("#placeholder", [d], options);
+		  }
 
 		}).fail(function(xhr, status, error) {
 				 console.log( "error: status=" + status + ", response: " + xhr.responseText );
@@ -126,21 +134,46 @@
 				opts.min = ranges.xaxis.from;
 				opts.max = ranges.xaxis.to;
 			});
-			plot.setupGrid();
-			plot.draw();
-			plot.clearSelection();
 			
-			var records = 0;
-			$.each( dates, function( key, val ) {
-				if (key >= ranges.xaxis.from && key < ranges.xaxis.to) {
-					records += val;
-				}
-			});
-			$('#selected_records').text('Selected: ' + records.toLocaleString() + " records");
+			var from = ranges.xaxis.from;
+			var to = ranges.xaxis.to;
+<%-- 			if (to-from < 3600000) {
+				var fromDate = new Date(from);
+				var url = "webapi/gcrf-REAR/metadata/" + "<%=request.getParameter("device")%>" + "/" 
+							+ fromDate.getFullYear() + "/"
+							+ (fromDate.getMonth()+1) + "/"
+							+ fromDate.getDate() + "/" 
+							+ fromDate.getHours() + "/";
+				getMetadataFrom(url, function() {
+					var records = 0;
+					$.each( dates, function( key, val ) {
+						if (key >= from && key < to) {
+							records += val;
+						}
+					});
+					$('#selected_records').text('Selected: ' + records.toLocaleString() + " records");
+					plot.setupGrid();
+					plot.draw();
+					plot.clearSelection();
+				});
+			}
+			else {
+ --%>				plot.setupGrid();
+				plot.draw();
+				plot.clearSelection();
+				var records = 0;
+				$.each( dates, function( key, val ) {
+					if (key >= from && key < to) {
+						records += val;
+					}
+				});
+				$('#selected_records').text('Selected: ' + records.toLocaleString() + " records");
+			//}
+			
 			$('#download').prop('disabled', false);
 			
-			var s = new Date(ranges.xaxis.from).toISOString();
-			var t = new Date(ranges.xaxis.to).toISOString();
+			var s = new Date(from).toISOString();
+			var t = new Date(to).toISOString();
 			setDateRange(s, t);
 
 			// don't fire event on the overview to prevent eternal loop
@@ -188,9 +221,6 @@
 //			plot.setSelection(ranges);
 //		});
 
-		// Add the Flot version string to the footer
-
-		$("#footer").prepend("Flot " + $.plot.version + " &ndash; ");
 	});
 
 	</script>
@@ -202,6 +232,8 @@
 	</div>
 
 	<div id="content">
+	
+		<div>This chart shows the number of records uploaded from this device.</div>
 
 		<div class="demo-container">
 			<div id="placeholder" class="demo-placeholder"></div>
@@ -231,6 +263,10 @@
 			<div id="overview" class="demo-placeholder"></div>
 		</div>
  -->
+ 
+ 		<div>
+ 		<a href="rear_device_info.jsp?device=<%=request.getParameter("device")%>">View list of all uploads</a>
+ 		</div>
 	</div>
 
 </body>
