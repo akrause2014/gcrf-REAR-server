@@ -260,14 +260,17 @@ public class DataStoreResource {
     	    			else {
     	    				first = false;
     	    			}
-    	    			writer.write(String.format("[%d,%d,%d,%d,%d,%d,%d]",
-    	    					result.getLong(3),
-    	    					result.getLong(4),
-    	    					result.getLong(5),
-    	    					result.getLong(6),
-    	    					result.getLong(7),
-    	    					result.getLong(8),
-    	    					result.getLong(9)));
+    	    			long system = result.getLong(7);
+    	    			if (!result.wasNull()) {
+	    	    			writer.write(String.format("[%d,%d,%d,%d,%d,%d,%d]",
+	    	    					result.getLong(3),
+	    	    					result.getLong(4),
+	    	    					result.getLong(5),
+	    	    					result.getLong(6),
+	    	    					system,
+	    	    					result.getLong(8),
+	    	    					result.getLong(9)));
+    	    			}
     	    		}
     	    		writer.write("\n]");
     	    		writer.close();
