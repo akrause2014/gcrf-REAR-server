@@ -254,14 +254,14 @@ public class DataStoreResource {
     	    		writer.write("[\n");
     	    		boolean first = true;
     	    		while (result.next()) {
-    	    			if (!first) {
-    	    				writer.write(",\n");
-    	    			}
-    	    			else {
-    	    				first = false;
-    	    			}
     	    			long system = result.getLong(7);
     	    			if (!result.wasNull()) {
+	    	    			if (!first) {
+	    	    				writer.write(",\n");
+	    	    			}
+	    	    			else {
+	    	    				first = false;
+	    	    			}
 	    	    			writer.write(String.format("[%d,%d,%d,%d,%d,%d,%d]",
 	    	    					result.getLong(3),
 	    	    					result.getLong(4),
