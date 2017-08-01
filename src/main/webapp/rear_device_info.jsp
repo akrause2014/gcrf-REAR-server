@@ -57,13 +57,14 @@ th, td {
     <th>Length (ms)</th>
     <th>Number of Records</th>
     <th></th>
+    <th></th>
     </tr>
     </thead>
     <tbody>
     <%
     DateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss.SSS");
     int device = RegisterDeviceResource.getDevice(request.getParameter("device"));
-	String query = "SELECT id, system, elapsed, start, end, length, records FROM uploads WHERE device=" + device;
+	String query = "SELECT id, system, elapsed, start, end, length, records FROM uploads WHERE device=" + device + " ORDER BY id DESC LIMIT 1000";
 	Connection con = null;
 	Statement statement = null;
 	ResultSet results = null;
@@ -95,6 +96,7 @@ th, td {
 				<td align="right"><%=formattedLength%></td>
 				<td align="right"><%=formattedRecords%></td>
 				<td><a href="webapi/gcrf-REAR/data/<%=request.getParameter("device")%>/<%=upload%>">Download</a></td>
+				<td><a href="locations.jsp?device=<%=request.getParameter("device")%>&upload=<%=upload%>">Map</a></td>
 			</tr>
 			<%
 		}

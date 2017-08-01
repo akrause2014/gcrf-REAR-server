@@ -304,7 +304,8 @@ public class MyResource {
 		                statementSensor.execute();
 		            	break;
 		            }
-		            case DataPoint.TYPE_LOCATION: {
+		            case DataPoint.TYPE_LOCATION:
+		            case DataPoint.TYPE_LOCATION_NETWORK: {
 		            	double latitude = dataStream.readDouble();
 		            	double longitude = dataStream.readDouble();
 		            	double altitude = dataStream.readDouble();

@@ -13,6 +13,7 @@ public abstract class DataPoint
 	public static final int SENSOR_TYPE_MAGNETIC_FIELD = 3;
 	public static final int TYPE_LOCATION = 4;
 	public static final int TYPE_TIME = 5;
+	public static final int TYPE_LOCATION_NETWORK = 6;
 	
 	protected final int upload;
 	protected final int sensorType;
@@ -55,7 +56,8 @@ public abstract class DataPoint
 		        dataPoint = new SensorDataPoint(uploadID, sensorType, timestamp, x, y, z);
 		    	break;
 		    }
-		    case DataPoint.TYPE_LOCATION: {
+		    case DataPoint.TYPE_LOCATION: 
+		    case DataPoint.TYPE_LOCATION_NETWORK: {
 		    	double latitude = dataStream.readDouble();
 		    	double longitude = dataStream.readDouble();
 		    	double altitude = dataStream.readDouble();

@@ -50,7 +50,7 @@ import org.glassfish.jersey.media.multipart.FormDataParam;
 import uk.ac.ed.epcc.rear.DataPoint;
 
 /**
- * CREATE TABLE devices (uuid BINARY(16), timestamp BIGINT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
+ * CREATE TABLE devices (uuid BINARY(16) NOT NULL, timestamp BIGINT, name VARCHAR(100), id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
  * CREATE TABLE uploads (timestamp BIGINT, device INT NOT NULL, id SERIAL PRIMARY KEY, FOREIGN KEY (device) REFERENCES rear.devices(id), start BIGINT, end BIGINT, length BIGINT, system BIGINT, elapsed BIGINT, records BIGINT);
  * ALTER TABLE uploads ADD INDEX `device` (`device`);
  * ALTER TABLE devices ADD INDEX `uuid` (`uuid`);
@@ -64,10 +64,11 @@ public class DataStoreResource {
 	public static final int VERSION = 1;
 	
 	private static final String DATA_DIR_PROP = "data.dir";
-	private static final String DATA_DIR;
+	public static final String DATA_DIR;
 	
-	private static final DateFormat DATE_FORMAT  = new SimpleDateFormat("yyyy,MM,dd,HH,mm,ss.SSS");
+	private static final DateFormat DATE_FORMAT  = new SimpleDateFormat("yyyy,MM,dd,HH,mm,ss,SSS");
 	private static final DateFormat URL_DATE_FORMAT  = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
+	private static final DateFormat TIMESTAMP_FORMAT  = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private static final String[] SENSOR_TYPES = {"A", "G", "M"};
 
 	
@@ -412,6 +413,36 @@ public class DataStoreResource {
     	
     }
     
+    @Path("/data/{device}")
+    @GET
+    @Produces(MediaType.TEXT_PLAIN)
+    public Response listData(
+    		@PathParam("device") String device) 
+    {
+    	int deviceId = RegisterDeviceResource.getDevice(device);
+    	StreamingOutput stream = new StreamingOutput() {
+    	    @Override
+    	    public void write(OutputStream os) throws IOException, WebApplicationException 
+    	    {
+    	    	File datadir = new File(new File(DATA_DIR), String.valueOf(deviceId));
+    	    	if (!datadir.exists() || !datadir.isDirectory()) {
+    	    		System.out.println("No data dir: " + datadir);
+    	    		return;
+    	    	}
+	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
+	    		writer.write("name,lastModified,size\n");
+    	    	for (File file : datadir.listFiles()) {
+    	    		if (file.isFile()) {
+    	    			String lastMod = TIMESTAMP_FORMAT.format(new Date(file.lastModified()));
+    	    			writer.write(String.format("%s, %s, %d\n", file.getName(), lastMod, file.length()));
+    	    		}
+    	    	}
+    	    	writer.close();
+    	    }
+    	};
+    	return Response.ok(stream).build();
+    }
+
     @Path("/data/{device}/{upload}")
     @GET
     @Produces(MediaType.TEXT_PLAIN)
@@ -431,7 +462,7 @@ public class DataStoreResource {
     	    		return;
     	    	}
 	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
-    			writer.write("year,month,day,hour,minute,second,sensortype,x,y,z\n");
+    			writer.write("year,month,day,hour,minute,second,millisecond,sensortype,x,y,z\n");
     	    	DataInputStream dataStream = new DataInputStream(new FileInputStream(file));
     	    	writeDataFile(dataStream, writer, systemStartTime);
     	    }
@@ -455,7 +486,7 @@ public class DataStoreResource {
     	    public void write(OutputStream os) throws IOException, WebApplicationException 
     	    {
 	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
-    			writer.write("year,month,day,hour,minute,second,sensortype,x,y,z\n");
+    			writer.write("year,month,day,hour,minute,second,millisecond,sensortype,x,y,z\n");
     			try {
 	    	    	for (int uploadId : uploads) {
 	    	    		String upload = String.valueOf(uploadId);
@@ -480,8 +511,6 @@ public class DataStoreResource {
 
     }
     
-
-    
     private int writeDataFile(DataInputStream dataStream, Writer writer, long systemStartTime) throws IOException {
 		int count = 0;
 		try {
@@ -505,7 +534,9 @@ public class DataStoreResource {
 	    			writer.write(line);
 	            	break;
 	            }
-	            case DataPoint.TYPE_LOCATION: {
+	            case DataPoint.TYPE_LOCATION:
+	            case DataPoint.TYPE_LOCATION_NETWORK: 
+	            {
 	            	double latitude = dataStream.readDouble();
 	            	double longitude = dataStream.readDouble();
 	            	double altitude = dataStream.readDouble();
@@ -604,7 +635,7 @@ public class DataStoreResource {
 		}
     }
 	
-	private static long getSystemTime(String upload) {
+	public static long getSystemTime(String upload) {
 		String query = "SELECT start, elapsed, system FROM uploads WHERE id=" + upload;
 		Connection con = null;
 		Statement s = null;
@@ -647,11 +678,12 @@ public class DataStoreResource {
 	public static DataSource getDataSource() throws NamingException
 	{
 		InitialContext cxt = new InitialContext();
-		DataSource ds = (DataSource) cxt.lookup( "java:/comp/env/jdbc/rear_meta_db" );
+//		DataSource ds = (DataSource) cxt.lookup( "java:/comp/env/jdbc/rear_meta_db" );
+		DataSource ds = (DataSource) cxt.lookup( "java:/comp/env/jdbc/rear_db" );
 		return ds;
 	}
 	 
-    private static File getFile(int device, int upload) {
+    public static File getFile(int device, int upload) {
     	File dir = new File(DATA_DIR, String.valueOf(device));
     	if (!dir.exists()) dir.mkdirs();
     	return new File(dir, String.valueOf(upload));

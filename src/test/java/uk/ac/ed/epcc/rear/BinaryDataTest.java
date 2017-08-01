@@ -12,28 +12,51 @@ import org.junit.Test;
 public class BinaryDataTest 
 {
 	
+	public static final int VERSION = 1;
+	
 	@Test
 	public void testWriteBinary() throws Exception {
 		Random random = new Random();
 		DataOutputStream outputStream = new DataOutputStream(new FileOutputStream("/tmp/datatest"));
-		outputStream.writeByte(1);
+		outputStream.writeByte(VERSION);
 		outputStream.writeByte(DataPoint.TYPE_TIME);
 		outputStream.writeLong(1000000);
-		outputStream.writeLong(System.currentTimeMillis());
-		outputStream.writeByte(1);
+		long currentTime = System.currentTimeMillis();
+		outputStream.writeLong(currentTime);
+		System.out.println("(" + 1000000 + ", " + currentTime + ")");
+		
+		outputStream.writeByte(VERSION);
 		outputStream.writeByte(DataPoint.TYPE_LOCATION);
 		outputStream.writeLong(1000000);
-		outputStream.writeDouble(55.9533);
-		outputStream.writeDouble(3.1883);
+		double lon = 55.921817;
+		double lat = -3.173189;
+		outputStream.writeDouble(lon);
+		outputStream.writeDouble(lat);
 		outputStream.writeDouble(47);
 		outputStream.writeFloat(2);
+		System.out.println("(" + 1000000 + ", " + lon + ", " + lat + ", " + 47d + ", " + 2f + ")");
+		
+		outputStream.writeByte(VERSION);
+		outputStream.writeByte(DataPoint.TYPE_LOCATION_NETWORK);
+		outputStream.writeLong(1000000);
+		outputStream.writeDouble(lon);
+		outputStream.writeDouble(lat);
+		outputStream.writeDouble(47);
+		outputStream.writeFloat(2);
+		System.out.println("(" + 1000000 + ", " + lon + ", " + lat + ", " + 47d + ", " + 2f + ")");
+
 		for (int i=0; i<10; i++) {
-			outputStream.writeByte(1); // version
+			outputStream.writeByte(VERSION); // version
 			outputStream.writeByte(1); // sensor type: accelerometer
-			outputStream.writeLong(1000000+i*20000000); // timestamp
-			outputStream.writeFloat(random.nextFloat()); // X
-			outputStream.writeFloat(random.nextFloat()); // Y
-			outputStream.writeFloat(random.nextFloat()); // Z
+			int timestamp = 1000000+i*20;
+			outputStream.writeLong(timestamp); // timestamp
+			float x = random.nextFloat();
+			float y = random.nextFloat();
+			float z = random.nextFloat();
+			outputStream.writeFloat(x); // X
+			outputStream.writeFloat(y); // Y
+			outputStream.writeFloat(z); // Z
+			System.out.println("(" + timestamp + ", " + x + ", " + y + ", " + z + ")");
 		}
 		outputStream.close();
 	}

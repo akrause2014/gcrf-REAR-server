@@ -16,6 +16,7 @@ public class LocationDataPoint extends DataPoint {
 	private double longitude;
 	private double altitude;
 	private float accuracy;
+	private int type;
 
 	public LocationDataPoint(int upload, int sensorType, long timestamp, 
 			double latitude, double longitude, double altitude, float accuracy) {
@@ -25,6 +26,7 @@ public class LocationDataPoint extends DataPoint {
 		this.longitude = longitude;
 		this.altitude = altitude;
 		this.accuracy = accuracy;
+		this.type = sensorType;
 	}
 	
 	public double getLatitude() {

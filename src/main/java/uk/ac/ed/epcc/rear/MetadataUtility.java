@@ -43,7 +43,8 @@ public class MetadataUtility {
 		            count++;
 	            	break;
 	            }
-	            case DataPoint.TYPE_LOCATION: {
+	            case DataPoint.TYPE_LOCATION:
+	            case DataPoint.TYPE_LOCATION_NETWORK: {
 	            	double latitude = dataStream.readDouble();
 	            	double longitude = dataStream.readDouble();
 	            	double altitude = dataStream.readDouble();
@@ -55,6 +56,7 @@ public class MetadataUtility {
 	            }
 	            case DataPoint.TYPE_TIME: {
 	            	long systemTime = dataStream.readLong();
+	            	System.out.println("System time: " + systemTime + ", elapsed: " + timestamp);
 	            	system = systemTime;
 	            	elapsed = timestamp;
 	            	break;

@@ -26,6 +26,8 @@ import javax.ws.rs.ServerErrorException;
 import javax.ws.rs.core.MediaType;
 
 /**
+ * CREATE TABLE devices (uuid BINARY(16) NOT NULL, timestamp BIGINT, name VARCHAR(100), id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
+ * 
  * SELECT(uuid), FROM_UNIXTIME(timestamp/1000), id FROM devices;
  */
 
@@ -118,6 +120,51 @@ public class RegisterDeviceResource {
 			if (query != null) query.close();
 		}
     }
+   
+    public static String getDeviceByName(Connection con, String name) throws SQLException, UnknownDeviceException 
+    {
+		Statement query = null;
+		ResultSet result = null;
+		try {
+			query = con.createStatement();
+			result = query.executeQuery("SELECT name FROM devices WHERE name=\"" + name + "\"");
+			if (result.next()) {
+				// using the first device in the database
+				// assumes that the device name is unique... 
+				return result.getString(1);
+			}
+			else {
+				throw new UnknownDeviceException(name);
+			}
+		}
+		finally {
+			if (result != null) result.close();
+			if (query != null) query.close();
+		}
+    }
+    
+    public static String getDeviceByName(String name)
+    {
+    	Connection con = null;
+    	try {
+    		con = getDataSource().getConnection();
+        	try {
+        		return getDeviceByName(con, name);
+        	} catch (UnknownDeviceException e) {
+        		throw new NotFoundException("Unknown device: " + name);
+        	}
+    	}
+    	catch (SQLException e) {
+			throw new ServerErrorException(500);
+		} catch (NamingException e) {
+			throw new ServerErrorException(500);
+		}
+    	finally {
+    		closeConnection(con);
+    	}
+    }
+
+
    
     public static int getDevice(String device)
     {

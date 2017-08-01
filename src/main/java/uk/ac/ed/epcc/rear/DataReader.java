@@ -2,28 +2,24 @@ package uk.ac.ed.epcc.rear;
 
 import java.io.DataInputStream;
 import java.io.EOFException;
+import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
 
 import javax.ws.rs.ServerErrorException;
 
-public class LocationUtility {
+import uk.ac.ed.epcc.DataStoreResource;
+
+public class DataReader {
 	
-	public static final int VERSION = 1;
-	
-	public static void main(String[] args) throws IOException {
-		if (args.length < 2) {
-			throw new IllegalArgumentException("Missing arguments: input and output file names");
-		}
-		DataInputStream dataStream = new DataInputStream(new FileInputStream(args[0]));
-		Writer writer = new FileWriter(args[1]);
-		int count = 0;
+	public void read(File file, DataVisitor visitor) throws IOException 
+	{
+		DataInputStream dataStream = null;
 		try {
+			dataStream = new DataInputStream(new FileInputStream(file));
 			while (true) {
 	    		byte version = dataStream.readByte();
-	    		if (version != VERSION) {
+	    		if (version != DataStoreResource.VERSION) {
 	    			new ServerErrorException("Unsupported message version: " + version, 400);
 	    		}
 	            int sensorType = dataStream.readByte();
@@ -35,6 +31,7 @@ public class LocationUtility {
 	                float x = dataStream.readFloat();
 	                float y = dataStream.readFloat();
 	                float z = dataStream.readFloat();
+	                visitor.visitSensor(timestamp, sensorType, x, y, z);
 	            	break;
 	            }
 	            case DataPoint.TYPE_LOCATION:
@@ -43,12 +40,12 @@ public class LocationUtility {
 	            	double longitude = dataStream.readDouble();
 	            	double altitude = dataStream.readDouble();
 	            	float accuracy = dataStream.readFloat();
-	            	writer.write(String.format("%f,%f,%f\n", latitude, longitude, altitude));
-	            	count++;
+	            	visitor.visitLocation(timestamp, sensorType, latitude, longitude, altitude, accuracy);
 	            	break;
 	            }
 	            case DataPoint.TYPE_TIME: {
 	            	long systemTime = dataStream.readLong();
+	            	visitor.visitTime(timestamp, systemTime);
 	            	break;
 	            }
 	            default:
@@ -59,10 +56,11 @@ public class LocationUtility {
 			
 		} catch (EOFException e) {
 			// end of file
-			writer.flush();
-			writer.close();
+			visitor.visitEndOfFile();
 		}
-		System.out.println("Wrote " + count + " location records to " + args[1] + ".\n");
-	}
+		
+		if (dataStream != null) dataStream.close();
+
+    }
 
 }
