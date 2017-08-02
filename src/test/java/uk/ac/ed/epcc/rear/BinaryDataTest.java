@@ -1,13 +1,24 @@
 package uk.ac.ed.epcc.rear;
 
+import static org.junit.Assert.*;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.FileOutputStream;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.Random;
 
 import org.junit.Test;
 
+import uk.ac.ed.epcc.LocationResource;
+
+/**
+ * 
+ *
+ */
 
 public class BinaryDataTest 
 {
@@ -76,6 +87,24 @@ public class BinaryDataTest
 			outputStream.writeLong(3000000000l); // end time (nanos)
 			outputStream.close();
 		}
+	}
+	
+	@Test
+	public void testWriteLocation() throws Exception {
+		double lon = 55.921817;
+		double lat = -3.173189;
+		DataOutputStream outputStream = new DataOutputStream(new FileOutputStream("/tmp/locationtest"));
+		outputStream.writeLong(new Date().getTime());
+		outputStream.writeInt(0);
+		outputStream.writeDouble(lon);
+		outputStream.writeDouble(lat);
+		outputStream.writeFloat(10.0f);
+		outputStream.writeLong(new Date().getTime());
+		outputStream.writeInt(0);
+		outputStream.writeDouble(lon);
+		outputStream.writeDouble(lat);
+		outputStream.writeFloat(10.0f);
+		outputStream.close();
 	}
 
 }

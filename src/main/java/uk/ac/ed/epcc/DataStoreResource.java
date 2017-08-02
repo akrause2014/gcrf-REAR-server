@@ -370,7 +370,7 @@ public class DataStoreResource {
 			long uploadTs = System.currentTimeMillis()/1000;
     		con = getDataSource().getConnection();
 			int uploadID = createUpload(con, uploadTs, deviceId, start, end, systemTime, numRecords);
-			System.out.println(new Date() + ": Created upload " + uploadID + " for device " + device);
+//			System.out.println(new Date() + ": Created upload " + uploadID + " for device " + device);
 			byte[] buf = new byte[4096];
 			OutputStream os = null;
 			try {
@@ -380,7 +380,7 @@ public class DataStoreResource {
 				while ((len=is.read(buf)) != -1) {
 					os.write(buf, 0, len);
 				}
-				System.out.println(new Date() + ": Upload " + uploadID + " to " + file + " complete for device " + device);
+//				System.out.println(new Date() + ": Upload " + uploadID + " to " + file + " complete for device " + device);
 				return uploadID;
 			} catch (FileNotFoundException e) {
 				e.printStackTrace();

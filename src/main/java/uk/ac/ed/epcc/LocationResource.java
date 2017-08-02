@@ -1,19 +1,25 @@
 package uk.ac.ed.epcc;
 
+import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
 import javax.naming.NamingException;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -28,14 +34,65 @@ import uk.ac.ed.epcc.rear.DataReader;
 import uk.ac.ed.epcc.rear.DataVisitor;
 
 /**
- * CREATE TABLE devices (uuid BINARY(16) NOT NULL, timestamp BIGINT, name VARCHAR(100), id INT NOT NULL AUTO_INCREMENT PRIMARY KEY);
- * CREATE TABLE uploads (timestamp BIGINT, device INT NOT NULL, id SERIAL PRIMARY KEY, FOREIGN KEY (device) REFERENCES rear.devices(id), start BIGINT, end BIGINT, length BIGINT, system BIGINT, elapsed BIGINT, records BIGINT);
- * ALTER TABLE uploads ADD INDEX `device` (`device`);
- * ALTER TABLE devices ADD INDEX `uuid` (`uuid`);
+ * CREATE TABLE location (timestamp BIGINT, device INT NOT NULL, provider INT, latitude DOUBLE, longitude DOUBLE, accuracy FLOAT, id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, FOREIGN KEY (device) REFERENCES rear.devices(id));
+ * 
+ * curl -X POST -H "Content-Type: application/octet-stream" --data-binary @/tmp/locationtest http://localhost:8080/gcrfREAR/webapi/gcrf-REAR/location/CF3A75A8AC204DDEA95427C65DD51929/
  */
 
 @Path("gcrf-REAR")
 public class LocationResource {
+	
+	@Path("/location/{device}") 
+    @POST
+    @Consumes(MediaType.APPLICATION_OCTET_STREAM)
+	public void postLocation(
+			@PathParam("device") String device, 
+			InputStream is) 
+	{
+//		System.out.println("RECEIVING LOCATION DATA");
+		int deviceId = RegisterDeviceResource.getDevice(device);
+		Connection con = null;
+		PreparedStatement statement = null;
+    	try {
+    		DataInputStream ds = new DataInputStream(is);
+    		con = DataStoreResource.getDataSource().getConnection();
+    		statement = con.prepareStatement(
+    				"INSERT INTO location (timestamp, device, provider, latitude, longitude, accuracy) VALUES (?,?,?,?,?,?)");
+    		while (true) {
+    			long timestamp = ds.readLong();
+    			int provider = ds.readInt();
+    			double latitude = ds.readDouble();
+    			double longitude = ds.readDouble();
+    			float accuracy = ds.readFloat();
+    			statement.setLong(1, timestamp);
+    			statement.setInt(2, deviceId);
+    			statement.setInt(3, provider);
+    			statement.setDouble(4, latitude);
+    			statement.setDouble(5, longitude);
+    			statement.setFloat(6, accuracy);
+    			int result = statement.executeUpdate();
+    		}
+		} catch (EOFException e) {
+			// end of file
+		} catch (SQLException e) {
+			throw new ServerErrorException("Server error", 500, e);
+		} catch (NamingException e) {
+			throw new ServerErrorException("Server error", 500, e);
+		} catch (IOException e) {
+			throw new ServerErrorException("Server error", 500, e);
+		}
+    	finally {
+			try {
+	    		if (statement != null) statement.close();
+			} catch (SQLException e) {
+			}
+			try {
+	    		if (con != null) con.close();
+			} catch (SQLException e) {
+			}
+    	}
+
+	}
 
     @Path("/location/{device}/uploads/{upload}")
     @GET
