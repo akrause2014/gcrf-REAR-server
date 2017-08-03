@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import javax.naming.NamingException;
@@ -223,18 +224,23 @@ public class LocationResource {
 		}
 	};
 
-	public static List<Double[]> getCoordinates(String device) {
+	public static List<Location> getCoordinates(String device) {
 		Connection con = null;
 		Statement statement = null;
 		ResultSet rs = null;
 		int deviceId = RegisterDeviceResource.getDevice(device);
-		List<Double[]> coordinates = new ArrayList<Double[]>();
+		List<Location> coordinates = new ArrayList<>();
 		try {
 		    con = DataStoreResource.getDataSource().getConnection();
 		    statement = con.createStatement();
 		    rs = statement.executeQuery("SELECT timestamp, provider, latitude, longitude, accuracy FROM location WHERE device=" + deviceId);
 			while (rs.next()) {
-				coordinates.add(new Double[] {rs.getDouble("latitude"), rs.getDouble("longitude")});
+				coordinates.add(new Location(
+						rs.getLong("timestamp"),
+						rs.getDouble("latitude"), 
+						rs.getDouble("longitude"),
+						rs.getFloat("accuracy"),
+						rs.getInt("provider")));
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -257,6 +263,26 @@ public class LocationResource {
 			}
 		}
 		return coordinates;
+	}
+	
+	public static class Location {
+		public final double latitude;
+		public final double longitude;
+		public final Date timestamp;
+		public final float accuracy;
+		public final String provider;
+		
+		public Location(long timestamp, double lat, double lon, float acc, int prov) {
+			longitude = lon;
+			latitude = lat;
+			this.timestamp = new Date(timestamp);
+			accuracy = acc;
+			switch (prov) {
+			case 1: provider = "GPS"; break;
+			case 2: provider = "network"; break;
+			default: provider = "Unknown";
+			}
+		}
 	}
 
 	
