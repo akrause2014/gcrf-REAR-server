@@ -14,6 +14,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.naming.NamingException;
 import javax.ws.rs.Consumes;
@@ -221,6 +223,41 @@ public class LocationResource {
 		}
 	};
 
+	public static List<Double[]> getCoordinates(String device) {
+		Connection con = null;
+		Statement statement = null;
+		ResultSet rs = null;
+		int deviceId = RegisterDeviceResource.getDevice(device);
+		List<Double[]> coordinates = new ArrayList<Double[]>();
+		try {
+		    con = DataStoreResource.getDataSource().getConnection();
+		    statement = con.createStatement();
+		    rs = statement.executeQuery("SELECT timestamp, provider, latitude, longitude, accuracy FROM location WHERE device=" + deviceId);
+			while (rs.next()) {
+				coordinates.add(new Double[] {rs.getDouble("latitude"), rs.getDouble("longitude")});
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		finally {
+			try {
+				if (rs != null)	rs.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+			try {
+				if (statement != null) statement.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+			try {
+				if (con != null) con.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
+			}
+		}
+		return coordinates;
+	}
 
 	
 }
