@@ -68,11 +68,14 @@ public class DataStoreResource {
 	
 	private static final DateFormat DATE_FORMAT  = new SimpleDateFormat("yyyy,MM,dd,HH,mm,ss,SSS");
 	private static final DateFormat URL_DATE_FORMAT  = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
-	private static final DateFormat TIMESTAMP_FORMAT  = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private static final DateFormat TIMESTAMP_FORMAT  = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 	private static final String[] SENSOR_TYPES = {"A", "G", "M"};
 
 	
 	static {
+		TimeZone utcTZ = TimeZone.getTimeZone("UTC");
+		TIMESTAMP_FORMAT.setTimeZone(utcTZ);
+		DATE_FORMAT.setTimeZone(utcTZ);
 		Properties properties = new Properties();
 		try {
 			InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream("/default.properties");
@@ -430,11 +433,11 @@ public class DataStoreResource {
     	    		return;
     	    	}
 	    		Writer writer = new BufferedWriter(new OutputStreamWriter(os));
-	    		writer.write("name,lastModified,size\n");
+	    		writer.write("id,lastModified(UTC),size(Bytes)\n");
     	    	for (File file : datadir.listFiles()) {
     	    		if (file.isFile()) {
     	    			String lastMod = TIMESTAMP_FORMAT.format(new Date(file.lastModified()));
-    	    			writer.write(String.format("%s, %s, %d\n", file.getName(), lastMod, file.length()));
+    	    			writer.write(String.format("%s,%s,%d\n", file.getName(), lastMod, file.length()));
     	    		}
     	    	}
     	    	writer.close();

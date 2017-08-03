@@ -79,7 +79,7 @@
                 <td><a href="locations.jsp?device=<%=device%>"><%=device%></a></td>
                 <td><%=name%></td>
                 <td><%=ts%></td>
-                <td><%=lm%></td>
+                <td><a href="webapi/gcrf-REAR/data/<%=device%>"><%=lm%></a></td>
             </tr>
             <%
         }
